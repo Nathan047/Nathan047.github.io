@@ -169,7 +169,7 @@
 
   var scene = new THREE.Scene();
   var camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
-  camera.position.set(0, 1.15, 8.6);
+  camera.position.set(0, 1.3, 9.2);
   camera.lookAt(0, 0, 0);
 
   var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
@@ -191,14 +191,28 @@
   var HEX_R = 1.08;
   var COUNT = 70;
 
-  // Beehive (skep) silhouette: full width through the belly, tapering
-  // hard toward a small rounded top and gently toward a broader base --
-  // deliberately asymmetric, unlike a plain sphere.
+  // Beehive (skep) silhouette, defined as radius-at-height control points
+  // from top to base: a tight tapered crown, a flared shoulder, and a
+  // rounded, broader foot -- deliberately asymmetric, unlike a sphere.
+  var HIVE_PROFILE = [
+    [1.00, 0.10],
+    [0.65, 0.50],
+    [0.25, 0.95],
+    [0.00, 1.00],
+    [-0.25, 1.10],
+    [-0.55, 1.06],
+    [-0.85, 0.88],
+    [-1.00, 0.64]
+  ];
   function hiveProfile(y) {
-    if (y >= 0) {
-      return 1 - Math.pow(y, 1.7) * 0.85;
+    for (var j = 0; j < HIVE_PROFILE.length - 1; j++) {
+      var a = HIVE_PROFILE[j], b = HIVE_PROFILE[j + 1];
+      if (y <= a[0] && y >= b[0]) {
+        var t = (a[0] - y) / (a[0] - b[0]);
+        return a[1] + (b[1] - a[1]) * t;
+      }
     }
-    return 1 - Math.pow(-y, 2.4) * 0.42;
+    return 1.0;
   }
 
   var points = [];
@@ -210,7 +224,7 @@
     var azX = radiusAtY > 1e-6 ? Math.cos(theta) : 0;
     var azZ = radiusAtY > 1e-6 ? Math.sin(theta) : 0;
     var profileR = hiveProfile(y);
-    points.push(new THREE.Vector3(azX * profileR, y, azZ * profileR));
+    points.push(new THREE.Vector3(azX * profileR, y * 1.15, azZ * profileR));
   }
 
   function azimuth(p) { return Math.atan2(p.z, p.x); }
