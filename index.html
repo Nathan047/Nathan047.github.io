@@ -86,12 +86,19 @@
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: 6px;
+    color: inherit;
+    text-decoration: none;
     transition: border-color 0.15s ease, transform 0.15s ease;
   }
 
   .entry:hover {
     border-color: var(--accent);
     transform: translateY(-2px);
+  }
+
+  .entry:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 
   .entry-index {
@@ -191,7 +198,23 @@
   </header>
 
   <ul class="ledger">
-    <li class="empty-state">No projects logged yet — the first one goes here.</li>
+    <li>
+      <a class="entry" href="https://claude.ai/code/artifact/04e41724-6b9f-4958-b863-8f2f4097f209" target="_blank" rel="noopener">
+        <div class="entry-index">№ 001</div>
+        <div class="entry-body">
+          <h2>To-Do List</h2>
+          <p>A checklist that saves itself — tasks fade away the moment you tick them off.</p>
+          <div class="tags">
+            <span class="tag">HTML</span>
+            <span class="tag">JavaScript</span>
+          </div>
+        </div>
+        <div class="entry-footer">
+          <span class="status shipped">Shipped</span>
+          <span class="entry-date">Sep 2026</span>
+        </div>
+      </a>
+    </li>
   </ul>
 
   <footer>
