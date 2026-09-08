@@ -188,8 +188,18 @@
   scene.add(hive);
 
   var SPHERE_R = 3.2;
-  var HEX_R = 0.98;
-  var COUNT = 64;
+  var HEX_R = 1.08;
+  var COUNT = 70;
+
+  // Beehive (skep) silhouette: full width through the belly, tapering
+  // hard toward a small rounded top and gently toward a broader base --
+  // deliberately asymmetric, unlike a plain sphere.
+  function hiveProfile(y) {
+    if (y >= 0) {
+      return 1 - Math.pow(y, 1.7) * 0.85;
+    }
+    return 1 - Math.pow(-y, 2.4) * 0.42;
+  }
 
   var points = [];
   var golden = Math.PI * (3 - Math.sqrt(5));
@@ -197,7 +207,10 @@
     var y = 1 - (i / (COUNT - 1)) * 2;
     var radiusAtY = Math.sqrt(Math.max(0, 1 - y * y));
     var theta = golden * i;
-    points.push(new THREE.Vector3(Math.cos(theta) * radiusAtY, y, Math.sin(theta) * radiusAtY));
+    var azX = radiusAtY > 1e-6 ? Math.cos(theta) : 0;
+    var azZ = radiusAtY > 1e-6 ? Math.sin(theta) : 0;
+    var profileR = hiveProfile(y);
+    points.push(new THREE.Vector3(azX * profileR, y, azZ * profileR));
   }
 
   function azimuth(p) { return Math.atan2(p.z, p.x); }
@@ -232,6 +245,7 @@
   points.forEach(function (dir, idx) {
     var pIdx = projectIndices.indexOf(idx);
     var pos = dir.clone().multiplyScalar(SPHERE_R);
+    var normalDir = dir.clone().normalize();
     if (pIdx !== -1) {
       var pdata = PROJECTS[pIdx];
       var mat = new THREE.MeshLambertMaterial({
@@ -242,13 +256,13 @@
       var geo = new THREE.CylinderGeometry(HEX_R * 1.12, HEX_R * 1.12, 0.05, 6);
       var mesh = new THREE.Mesh(geo, mat);
       mesh.position.copy(pos);
-      mesh.quaternion.setFromUnitVectors(upv, dir);
+      mesh.quaternion.setFromUnitVectors(upv, normalDir);
       mesh.userData.project = pdata;
       hive.add(mesh);
       projectMeshes.push(mesh);
     } else {
       dummy.position.copy(pos);
-      dummy.quaternion.setFromUnitVectors(upv, dir);
+      dummy.quaternion.setFromUnitVectors(upv, normalDir);
       var s = 0.96 + Math.random() * 0.1;
       dummy.scale.set(s, 1, s);
       dummy.updateMatrix();
