@@ -540,7 +540,7 @@
       <h2>Your Squad</h2>
       <div class="stat-row">
         <div class="stat">
-          <span class="stat-label">Budget left</span>
+          <span class="stat-label" id="stat-budget-label">Budget left</span>
           <span class="stat-value" id="stat-budget">£100.0m</span>
         </div>
         <div class="stat">
@@ -548,7 +548,7 @@
           <span class="stat-value" id="stat-count">0 / 15</span>
         </div>
         <div class="stat">
-          <span class="stat-label">Squad cost</span>
+          <span class="stat-label" id="stat-cost-label">Squad cost</span>
           <span class="stat-value" id="stat-cost">£0.0m</span>
         </div>
         <div class="stat">
@@ -603,6 +603,7 @@
   var POSITION_LABELS = { 1: 'Goalkeeper', 2: 'Defender', 3: 'Midfielder', 4: 'Forward' };
   var STATUS_LABELS = { a: 'Available', d: 'Doubtful', i: 'Injured', s: 'Suspended', u: 'Unavailable', n: 'Unavailable' };
   var bootData = null;
+  var importedBudget = null;
 
   var allPlayers = [];
   var squad = loadSquad();
@@ -724,19 +725,35 @@
       return;
     }
     squad.push(player);
+    importedBudget = null;
     saveSquad();
     renderAll();
   }
 
   function removePlayer(name) {
     squad = squad.filter(function (p) { return p.name !== name; });
+    importedBudget = null;
     saveSquad();
     renderAll();
   }
 
   function renderSummary() {
-    var cost = squadCost();
-    var remaining = BUDGET - cost;
+    var budgetLabel = document.getElementById('stat-budget-label');
+    var costLabel = document.getElementById('stat-cost-label');
+    var remaining, cost;
+
+    if (importedBudget) {
+      remaining = importedBudget.bank;
+      cost = importedBudget.value - importedBudget.bank;
+      budgetLabel.textContent = 'In the bank (FPL)';
+      costLabel.textContent = 'Squad value (FPL)';
+    } else {
+      cost = squadCost();
+      remaining = BUDGET - cost;
+      budgetLabel.textContent = 'Budget left';
+      costLabel.textContent = 'Squad cost';
+    }
+
     var budgetEl = document.getElementById('stat-budget');
     budgetEl.textContent = money(remaining);
     budgetEl.className = 'stat-value' + (remaining < 0 ? ' bad' : '');
@@ -858,12 +875,11 @@
     if (!squad.length) return;
     if (confirm('Clear your entire squad?')) {
       squad = [];
+      importedBudget = null;
       saveSquad();
       renderAll();
     }
   });
-
-  var WORKER_BASE = 'https://fpl-proxy.ncook20222.workers.dev';
 
   function importTeam() {
     var input = document.getElementById('team-id');
@@ -910,10 +926,21 @@
                 });
 
                 squad = matched;
+                if (picksData.entry_history && typeof picksData.entry_history.bank === 'number') {
+                  importedBudget = {
+                    bank: picksData.entry_history.bank / 10,
+                    value: picksData.entry_history.value / 10
+                  };
+                } else {
+                  importedBudget = null;
+                }
                 saveSquad();
                 renderAll();
 
                 var msg = 'Imported ' + matched.length + ' of 15 players from "' + entry.name + '".';
+                if (importedBudget) {
+                  msg += ' £' + importedBudget.bank.toFixed(1) + 'm in the bank, from your real FPL account.';
+                }
                 if (unmatched.length) {
                   msg += ' Couldn\'t match: ' + unmatched.join(', ') + '.';
                 }
