@@ -175,8 +175,8 @@
   var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
-  scene.add(new THREE.AmbientLight(0x8fa3c0, 0.55));
-  var key = new THREE.DirectionalLight(0xffd9a0, 1.15);
+  scene.add(new THREE.AmbientLight(0x8fa3c0, 0.85));
+  var key = new THREE.DirectionalLight(0xffd9a0, 0.9);
   key.position.set(4, 5, 6);
   scene.add(key);
   var rim = new THREE.DirectionalLight(0x5577cc, 0.4);
@@ -221,8 +221,8 @@
     if (best !== null) { used[best] = true; projectIndices.push(best); }
   }
 
-  var waxMat = new THREE.MeshStandardMaterial({ color: 0xb5822f, roughness: 0.55, metalness: 0.08 });
-  var waxGeo = new THREE.CylinderGeometry(HEX_R, HEX_R, HEX_R * 0.32, 6);
+  var waxMat = new THREE.MeshLambertMaterial({ color: 0xdb9b34 });
+  var waxGeo = new THREE.CylinderGeometry(HEX_R, HEX_R, 0.05, 6);
   var instanced = new THREE.InstancedMesh(waxGeo, waxMat, COUNT - projectIndices.length);
   var dummy = new THREE.Object3D();
   var upv = new THREE.Vector3(0, 1, 0);
@@ -234,14 +234,12 @@
     var pos = dir.clone().multiplyScalar(SPHERE_R);
     if (pIdx !== -1) {
       var pdata = PROJECTS[pIdx];
-      var mat = new THREE.MeshStandardMaterial({
-        color: 0xe0a94a,
-        emissive: 0x5a3a10,
-        emissiveIntensity: 0.5,
-        roughness: 0.35,
-        metalness: 0.15
+      var mat = new THREE.MeshLambertMaterial({
+        color: 0xf4c04a,
+        emissive: 0x3a2306,
+        emissiveIntensity: 0.6
       });
-      var geo = new THREE.CylinderGeometry(HEX_R * 1.12, HEX_R * 1.12, HEX_R * 0.42, 6);
+      var geo = new THREE.CylinderGeometry(HEX_R * 1.12, HEX_R * 1.12, 0.05, 6);
       var mesh = new THREE.Mesh(geo, mat);
       mesh.position.copy(pos);
       mesh.quaternion.setFromUnitVectors(upv, dir);
