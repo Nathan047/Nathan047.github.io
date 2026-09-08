@@ -188,7 +188,7 @@
   scene.add(hive);
 
   var SPHERE_R = 3.2;
-  var HEX_R = 1.08;
+  var HEX_R = 1.18;
   var COUNT = 70;
 
   // Beehive (skep) silhouette, defined as radius-at-height control points
@@ -315,7 +315,7 @@
     var pIdx = projectIndices.indexOf(idx);
     var pos = dir.clone().multiplyScalar(SPHERE_R);
     var normalDir = dir.clone().normalize();
-    var r = Math.min(nearestDist[idx] * 0.44, HEX_R);
+    var r = Math.min(nearestDist[idx] * 0.48, HEX_R);
 
     if (pIdx !== -1) {
       var pdata = PROJECTS[pIdx];
