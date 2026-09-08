@@ -506,7 +506,7 @@
   <a class="back-link" href="/">← The Hive</a>
   <header class="hero">
     <h1>FPL Team Manager</h1>
-    <p class="tagline">Build a 15-man Fantasy Premier League squad from this season's real prices and points — the budget, position quotas and club limits are enforced as you go.</p>
+    <p class="tagline">Build a 15-man Fantasy Premier League squad from this season's real prices and points — position quotas and club limits are enforced as you go, with your budget tracked live (going over is allowed, since real prices drift as the season plays out).</p>
   </header>
 
 
@@ -713,9 +713,6 @@
     }
     if (countByClub(player.club) >= MAX_PER_CLUB) {
       return { ok: false, reason: 'Max ' + MAX_PER_CLUB + ' players from ' + player.club + '.' };
-    }
-    if (squadCost() + player.price > BUDGET + 0.001) {
-      return { ok: false, reason: 'Adding ' + player.name + ' would go over your £' + BUDGET.toFixed(1) + 'm budget.' };
     }
     return { ok: true };
   }
