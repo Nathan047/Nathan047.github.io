@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nathan's Workshop</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --paper: #101d2e;
+    --surface: #172943;
+    --ink: #e7edf5;
+    --ink-soft: #a7bad2;
+    --ink-faint: #6d84a0;
+    --line: #263c58;
+    --accent: #e0a94a;
+    --accent-soft: #2b2414;
+    --status-shipped: #6fbf98;
+    --status-shipped-bg: #132922;
+    --status-progress: #e0a94a;
+    --status-progress-bg: #2b2414;
+    --status-archived: #93a7c0;
+    --status-archived-bg: #1b2c45;
+  }
+
+  * { box-sizing: border-box; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    line-height: 1.55;
+  }
+
+  .page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 4.5rem 1.5rem 4rem;
+  }
+
+  .hero {
+    margin-bottom: 2.75rem;
+  }
+
+  .eyebrow {
+    margin: 0 0 0.9rem;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    margin: 0 0 0.85rem;
+    font-family: "Fraunces", Georgia, serif;
+    font-optical-sizing: auto;
+    font-weight: 600;
+    font-size: clamp(2.6rem, 5vw, 3.4rem);
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    color: var(--ink);
+  }
+
+  .tagline {
+    margin: 0;
+    max-width: 46ch;
+    font-size: 1.05rem;
+    color: var(--ink-soft);
+    text-wrap: pretty;
+  }
+
+  .callout {
+    display: flex;
+    gap: 0.7rem;
+    align-items: baseline;
+    padding: 0.9rem 1.1rem;
+    margin-bottom: 2.5rem;
+    background: var(--accent-soft);
+    border-radius: 3px;
+    font-size: 0.9rem;
+    color: var(--ink);
+  }
+
+  .callout::before {
+    content: "";
+    flex: none;
+    width: 3px;
+    align-self: stretch;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .callout p { margin: 0; }
+  .callout strong { color: var(--accent); }
+
+  .ledger {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .entry {
+    display: grid;
+    grid-template-columns: 3.4rem 1fr auto;
+    gap: 1.5rem;
+    padding: 1.6rem 0;
+    border-bottom: 1px solid var(--line);
+    transition: background 0.15s ease;
+  }
+
+  .entry:hover {
+    background: var(--surface);
+  }
+
+  .entry-index {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.85rem;
+    color: var(--ink-faint);
+    padding-top: 0.2rem;
+    white-space: nowrap;
+  }
+
+  .entry-main h2 {
+    margin: 0 0 0.35rem;
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    font-size: 1.2rem;
+    letter-spacing: -0.005em;
+  }
+
+  .entry-main p {
+    margin: 0 0 0.75rem;
+    max-width: 52ch;
+    font-size: 0.95rem;
+    color: var(--ink-soft);
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .tag {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+    padding: 0.2rem 0.5rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--ink-soft);
+  }
+
+  .entry-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+    text-align: right;
+    padding-top: 0.15rem;
+  }
+
+  .status {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 0.25rem 0.55rem;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .status.shipped { color: var(--status-shipped); background: var(--status-shipped-bg); }
+  .status.progress { color: var(--status-progress); background: var(--status-progress-bg); }
+  .status.archived { color: var(--status-archived); background: var(--status-archived-bg); }
+
+  .entry-date {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+    white-space: nowrap;
+  }
+
+  .sample-flag {
+    font-size: 0.72rem;
+    font-style: italic;
+    color: var(--ink-faint);
+  }
+
+  footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--line);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+  }
+
+  @media (max-width: 640px) {
+    .entry {
+      grid-template-columns: 1fr;
+      gap: 0.6rem;
+    }
+    .entry-index {
+      padding-top: 0;
+    }
+    .entry-meta {
+      align-items: flex-start;
+      text-align: left;
+      flex-direction: row;
+      align-items: center;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="hero">
+    <p class="eyebrow">Workshop Log</p>
+    <h1>Nathan's Workshop</h1>
+    <p class="tagline">Every project that comes off the bench, newest first — a running record, not a highlight reel.</p>
+  </header>
+
+  <div class="callout">
+    <p><strong>These three entries are samples.</strong> Swap them for your own projects — tell Claude Code about a new build and it'll add an entry here.</p>
+  </div>
+
+  <ul class="ledger">
+    <li class="entry">
+      <div class="entry-index">№ 003</div>
+      <div class="entry-main">
+        <h2>Recipe Box</h2>
+        <p>A small web app for saving family recipes and searching them by ingredient instead of scrolling through screenshots.</p>
+        <div class="tags">
+          <span class="tag">React</span>
+          <span class="tag">Vite</span>
+          <span class="tag">SQLite</span>
+        </div>
+      </div>
+      <div class="entry-meta">
+        <span class="status progress">In progress</span>
+        <span class="entry-date">Sep 2026</span>
+        <span class="sample-flag">sample entry</span>
+      </div>
+    </li>
+    <li class="entry">
+      <div class="entry-index">№ 002</div>
+      <div class="entry-main">
+        <h2>Habit Tracker CLI</h2>
+        <p>A terminal app that logs daily habits and streaks to a local database, with a weekly summary printed on demand.</p>
+        <div class="tags">
+          <span class="tag">Python</span>
+          <span class="tag">SQLite</span>
+        </div>
+      </div>
+      <div class="entry-meta">
+        <span class="status shipped">Shipped</span>
+        <span class="entry-date">Aug 2026</span>
+        <span class="sample-flag">sample entry</span>
+      </div>
+    </li>
+    <li class="entry">
+      <div class="entry-index">№ 001</div>
+      <div class="entry-main">
+        <h2>Expense Splitter</h2>
+        <p>A script that divides shared household costs among roommates and emails everyone a summary at month's end.</p>
+        <div class="tags">
+          <span class="tag">Node.js</span>
+        </div>
+      </div>
+      <div class="entry-meta">
+        <span class="status archived">Archived</span>
+        <span class="entry-date">Jun 2026</span>
+        <span class="sample-flag">sample entry</span>
+      </div>
+    </li>
+  </ul>
+
+  <footer>
+    Maintained with Claude Code · last updated Sep 2026
+  </footer>
+</div>
+</body>
+</html>
