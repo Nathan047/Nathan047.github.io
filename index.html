@@ -176,7 +176,7 @@
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
   scene.add(new THREE.AmbientLight(0x8fa3c0, 0.85));
-  var key = new THREE.DirectionalLight(0xffd9a0, 0.9);
+  var key = new THREE.DirectionalLight(0xffd9a0, 0.65);
   key.position.set(4, 5, 6);
   scene.add(key);
   var rim = new THREE.DirectionalLight(0x5577cc, 0.4);
@@ -289,23 +289,23 @@
 
   // material index 0 = extruded sides + bevel (the darker rim),
   // material index 1 = the flat front/back caps (the glossy face)
-  var rimMat = new THREE.MeshStandardMaterial({ color: 0xa9691f, roughness: 0.55, metalness: 0.05 });
+  var rimMat = new THREE.MeshStandardMaterial({ color: 0xa9691f, roughness: 0.6, metalness: 0.05 });
   var capMat = new THREE.MeshPhysicalMaterial({
     color: 0xf7c948,
-    roughness: 0.22,
+    roughness: 0.35,
     metalness: 0.05,
-    clearcoat: 0.6,
-    clearcoatRoughness: 0.18
+    clearcoat: 0.5,
+    clearcoatRoughness: 0.4
   });
-  var projectRimMat = new THREE.MeshStandardMaterial({ color: 0xc47a1f, roughness: 0.45, metalness: 0.08 });
+  var projectRimMat = new THREE.MeshStandardMaterial({ color: 0xc47a1f, roughness: 0.5, metalness: 0.08 });
   var projectCapMat = new THREE.MeshPhysicalMaterial({
     color: 0xffe08a,
     emissive: 0x4a2c06,
-    emissiveIntensity: 0.55,
-    roughness: 0.15,
+    emissiveIntensity: 0.5,
+    roughness: 0.28,
     metalness: 0.05,
-    clearcoat: 0.8,
-    clearcoatRoughness: 0.1
+    clearcoat: 0.65,
+    clearcoatRoughness: 0.3
   });
 
   var fwd = new THREE.Vector3(0, 0, 1);
