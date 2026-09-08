@@ -248,42 +248,92 @@
     if (best !== null) { used[best] = true; projectIndices.push(best); }
   }
 
-  var waxMat = new THREE.MeshLambertMaterial({ color: 0xdb9b34 });
-  var waxGeo = new THREE.CylinderGeometry(HEX_R, HEX_R, 0.05, 6);
-  var instanced = new THREE.InstancedMesh(waxGeo, waxMat, COUNT - projectIndices.length);
-  var dummy = new THREE.Object3D();
-  var upv = new THREE.Vector3(0, 1, 0);
-  var instIdx = 0;
+  // Guarantee a visible gap (never an overlap) between every cell and its
+  // closest neighbour: size each hex off its own nearest-neighbour
+  // distance rather than a single fixed radius.
+  var worldPos = points.map(function (p) { return p.clone().multiplyScalar(SPHERE_R); });
+  var nearestDist = worldPos.map(function (p, i) {
+    var min = Infinity;
+    for (var j = 0; j < worldPos.length; j++) {
+      if (j === i) continue;
+      var d = p.distanceTo(worldPos[j]);
+      if (d < min) min = d;
+    }
+    return min;
+  });
+
+  function hexShape(r) {
+    var shape = new THREE.Shape();
+    for (var s = 0; s < 6; s++) {
+      var ang = (Math.PI / 3) * s;
+      var x = Math.cos(ang) * r;
+      var y = Math.sin(ang) * r;
+      if (s === 0) shape.moveTo(x, y); else shape.lineTo(x, y);
+    }
+    shape.closePath();
+    return shape;
+  }
+
+  function hexGeo(r) {
+    var geo = new THREE.ExtrudeGeometry(hexShape(r), {
+      depth: 0.16,
+      bevelEnabled: true,
+      bevelThickness: 0.06,
+      bevelSize: r * 0.1,
+      bevelSegments: 3,
+      curveSegments: 1
+    });
+    geo.translate(0, 0, -0.08);
+    return geo;
+  }
+
+  // material index 0 = extruded sides + bevel (the darker rim),
+  // material index 1 = the flat front/back caps (the glossy face)
+  var rimMat = new THREE.MeshStandardMaterial({ color: 0xa9691f, roughness: 0.55, metalness: 0.05 });
+  var capMat = new THREE.MeshPhysicalMaterial({
+    color: 0xf7c948,
+    roughness: 0.22,
+    metalness: 0.05,
+    clearcoat: 0.6,
+    clearcoatRoughness: 0.18
+  });
+  var projectRimMat = new THREE.MeshStandardMaterial({ color: 0xc47a1f, roughness: 0.45, metalness: 0.08 });
+  var projectCapMat = new THREE.MeshPhysicalMaterial({
+    color: 0xffe08a,
+    emissive: 0x4a2c06,
+    emissiveIntensity: 0.55,
+    roughness: 0.15,
+    metalness: 0.05,
+    clearcoat: 0.8,
+    clearcoatRoughness: 0.1
+  });
+
+  var fwd = new THREE.Vector3(0, 0, 1);
   var projectMeshes = [];
 
   points.forEach(function (dir, idx) {
     var pIdx = projectIndices.indexOf(idx);
     var pos = dir.clone().multiplyScalar(SPHERE_R);
     var normalDir = dir.clone().normalize();
+    var r = Math.min(nearestDist[idx] * 0.44, HEX_R);
+
     if (pIdx !== -1) {
       var pdata = PROJECTS[pIdx];
-      var mat = new THREE.MeshLambertMaterial({
-        color: 0xf4c04a,
-        emissive: 0x3a2306,
-        emissiveIntensity: 0.6
-      });
-      var geo = new THREE.CylinderGeometry(HEX_R * 1.12, HEX_R * 1.12, 0.05, 6);
-      var mesh = new THREE.Mesh(geo, mat);
+      var geo = hexGeo(r * 1.12);
+      var mesh = new THREE.Mesh(geo, [projectCapMat, projectRimMat]);
       mesh.position.copy(pos);
-      mesh.quaternion.setFromUnitVectors(upv, normalDir);
+      mesh.quaternion.setFromUnitVectors(fwd, normalDir);
       mesh.userData.project = pdata;
       hive.add(mesh);
       projectMeshes.push(mesh);
     } else {
-      dummy.position.copy(pos);
-      dummy.quaternion.setFromUnitVectors(upv, normalDir);
-      var s = 0.96 + Math.random() * 0.1;
-      dummy.scale.set(s, 1, s);
-      dummy.updateMatrix();
-      instanced.setMatrixAt(instIdx++, dummy.matrix);
+      var cellGeo = hexGeo(r);
+      var cellMesh = new THREE.Mesh(cellGeo, [capMat, rimMat]);
+      cellMesh.position.copy(pos);
+      cellMesh.quaternion.setFromUnitVectors(fwd, normalDir);
+      hive.add(cellMesh);
     }
   });
-  hive.add(instanced);
 
   function resize() {
     var w = sceneEl.clientWidth || 1;
