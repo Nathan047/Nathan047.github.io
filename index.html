@@ -10,7 +10,6 @@
   :root {
     --paper: #101d2e;
     --surface: #172943;
-    --surface-2: #1d3151;
     --ink: #e7edf5;
     --ink-soft: #a7bad2;
     --ink-faint: #6d84a0;
@@ -72,152 +71,54 @@
   /* ---------- 3D hive ---------- */
 
   .hive-scene {
-    height: 440px;
-    margin-top: 0.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    perspective: 1500px;
-  }
-
-  .hive {
     position: relative;
-    width: 1px;
-    height: 1px;
-    transform-style: preserve-3d;
-    transform: rotateX(-12deg) rotateY(0deg);
-    animation: hive-spin 38s linear infinite;
+    height: 460px;
+    margin-top: 0.5rem;
   }
 
-  .hive:hover,
-  .hive:focus-within {
-    animation-play-state: paused;
+  #hive-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
   }
 
-  @keyframes hive-spin {
-    from { transform: rotateX(-12deg) rotateY(0deg); }
-    to   { transform: rotateX(-12deg) rotateY(360deg); }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .hive { animation: none; }
-  }
-
-  .hive-ring {
+  .hive-tooltip {
     position: absolute;
     top: 0;
     left: 0;
-    transform-style: preserve-3d;
-  }
-
-  .hive-ring--top { transform: translateY(-140px); }
-  .hive-ring--mid { transform: translateY(0); }
-  .hive-ring--bottom { transform: translateY(140px); }
-
-  .hex {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
-    backface-visibility: hidden;
-    text-decoration: none;
-    color: inherit;
-  }
-
-  .hive-ring--top .hex,
-  .hive-ring--bottom .hex {
-    width: 108px;
-    height: 94px;
-    margin: -47px 0 0 -54px;
-    transform: rotateY(calc(var(--i) * 90deg)) translateZ(110px) scale(var(--hs, 1));
-    background: linear-gradient(150deg, var(--surface-2), var(--surface));
-    border: 1px solid var(--line);
-    opacity: 0.55;
-  }
-
-  .hive-ring--mid .hex {
-    width: 172px;
-    height: 150px;
-    margin: -75px 0 0 -86px;
-    transform: rotateY(calc(var(--i) * 60deg)) translateZ(195px) scale(var(--hs, 1));
-    background: linear-gradient(150deg, var(--surface-2), var(--surface));
-    border: 1px solid var(--line);
-  }
-
-  .hex--empty { cursor: default; }
-
-  .hex--filled {
-    cursor: pointer;
-    border-color: var(--accent);
-    transition: transform 0.2s ease;
-  }
-
-  .hex--filled:hover,
-  .hex--filled:focus-visible {
-    --hs: 1.08;
-    outline: none;
-  }
-
-  .hex--filled:focus-visible {
-    border-color: var(--ink);
-  }
-
-  .hex-inner {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.35rem;
-    width: 68%;
-    text-align: center;
-  }
-
-  .hex-index {
+    padding: 0.4rem 0.7rem;
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
     font-family: "IBM Plex Mono", monospace;
-    font-size: 0.66rem;
-    color: var(--ink-faint);
-  }
-
-  .hex-name {
-    font-family: "Fraunces", Georgia, serif;
-    font-weight: 600;
-    font-size: 0.98rem;
-    line-height: 1.15;
+    font-size: 0.78rem;
     color: var(--ink);
-  }
-
-  .hex-status {
-    font-family: "IBM Plex Mono", monospace;
-    font-size: 0.6rem;
-    font-weight: 500;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    padding: 0.15rem 0.45rem;
-    border-radius: 999px;
     white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.12s ease;
   }
-
-  .hex-status--shipped { color: var(--status-shipped); background: var(--status-shipped-bg); }
-  .hex-status--progress { color: var(--status-progress); background: var(--status-progress-bg); }
-  .hex-status--archived { color: var(--status-archived); background: var(--status-archived-bg); }
 
   .hive-caption {
     margin: 0.5rem 0 0;
     text-align: center;
     font-family: "IBM Plex Mono", monospace;
-    font-size: 0.75rem;
+    font-size: 0.78rem;
     color: var(--ink-faint);
   }
 
+  .hive-caption a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .hive-caption a:hover { text-decoration: underline; }
+  .hive-caption a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
   @media (max-width: 640px) {
-    .hive-scene { height: 420px; }
-    .hive { transform: rotateX(-12deg) rotateY(0deg) scale(0.62); }
-    @keyframes hive-spin {
-      from { transform: rotateX(-12deg) rotateY(0deg) scale(0.62); }
-      to   { transform: rotateX(-12deg) rotateY(360deg) scale(0.62); }
-    }
+    .hive-scene { height: 340px; }
   }
 
   footer {
@@ -237,49 +138,193 @@
     <p class="tagline">Every project I've designed, collected in one place.</p>
   </header>
 
-  <div class="hive-scene">
-    <div class="hive">
-      <div class="hive-ring hive-ring--top">
-        <span class="hex hex--empty" style="--i:0" aria-hidden="true"></span>
-        <span class="hex hex--empty" style="--i:1" aria-hidden="true"></span>
-        <span class="hex hex--empty" style="--i:2" aria-hidden="true"></span>
-        <span class="hex hex--empty" style="--i:3" aria-hidden="true"></span>
-      </div>
-
-      <div class="hive-ring hive-ring--mid">
-        <a class="hex hex--filled" href="/fpl/" style="--i:0">
-          <span class="hex-inner">
-            <span class="hex-index">№ 002</span>
-            <span class="hex-name">FPL Team Manager</span>
-            <span class="hex-status hex-status--shipped">Shipped</span>
-          </span>
-        </a>
-        <span class="hex hex--empty" style="--i:1" aria-hidden="true"></span>
-        <span class="hex hex--empty" style="--i:2" aria-hidden="true"></span>
-        <a class="hex hex--filled" href="/to-do-list/" style="--i:3">
-          <span class="hex-inner">
-            <span class="hex-index">№ 001</span>
-            <span class="hex-name">To-Do List</span>
-            <span class="hex-status hex-status--shipped">Shipped</span>
-          </span>
-        </a>
-        <span class="hex hex--empty" style="--i:4" aria-hidden="true"></span>
-        <span class="hex hex--empty" style="--i:5" aria-hidden="true"></span>
-      </div>
-
-      <div class="hive-ring hive-ring--bottom">
-        <span class="hex hex--empty" style="--i:0" aria-hidden="true"></span>
-        <span class="hex hex--empty" style="--i:1" aria-hidden="true"></span>
-        <span class="hex hex--empty" style="--i:2" aria-hidden="true"></span>
-        <span class="hex hex--empty" style="--i:3" aria-hidden="true"></span>
-      </div>
-    </div>
+  <div class="hive-scene" id="hive-scene">
+    <canvas id="hive-canvas"></canvas>
+    <div class="hive-tooltip" id="hive-tooltip"></div>
   </div>
-  <p class="hive-caption">Hover to pause the hive, click a filled cell to open a project.</p>
+  <p class="hive-caption">
+    Hover to pause the hive, click a glowing cell to open a project — or jump straight to
+    <a href="/to-do-list/">To-Do List</a> · <a href="/fpl/">FPL Team Manager</a>.
+  </p>
 
   <footer>
     Maintained with Claude Code · last updated Sep 2026
   </footer>
 </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  var canvas = document.getElementById('hive-canvas');
+  var sceneEl = document.getElementById('hive-scene');
+  var tooltip = document.getElementById('hive-tooltip');
+  if (typeof THREE === 'undefined' || !canvas) return;
+
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var PROJECTS = [
+    { name: 'To-Do List', status: 'Shipped', label: '№ 001', href: '/to-do-list/' },
+    { name: 'FPL Team Manager', status: 'Shipped', label: '№ 002', href: '/fpl/' }
+  ];
+
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  camera.position.set(0, 1.15, 8.6);
+  camera.lookAt(0, 0, 0);
+
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+  scene.add(new THREE.AmbientLight(0x8fa3c0, 0.55));
+  var key = new THREE.DirectionalLight(0xffd9a0, 1.15);
+  key.position.set(4, 5, 6);
+  scene.add(key);
+  var rim = new THREE.DirectionalLight(0x5577cc, 0.4);
+  rim.position.set(-5, -2, -4);
+  scene.add(rim);
+
+  var hive = new THREE.Group();
+  hive.rotation.x = -0.18;
+  scene.add(hive);
+
+  var SPHERE_R = 3.2;
+  var HEX_R = 0.85;
+  var COUNT = 64;
+
+  var points = [];
+  var golden = Math.PI * (3 - Math.sqrt(5));
+  for (var i = 0; i < COUNT; i++) {
+    var y = 1 - (i / (COUNT - 1)) * 2;
+    var radiusAtY = Math.sqrt(Math.max(0, 1 - y * y));
+    var theta = golden * i;
+    points.push(new THREE.Vector3(Math.cos(theta) * radiusAtY, y, Math.sin(theta) * radiusAtY));
+  }
+
+  function azimuth(p) { return Math.atan2(p.z, p.x); }
+
+  var equatorial = [];
+  points.forEach(function (p, idx) {
+    if (Math.abs(p.y) < 0.28) equatorial.push(idx);
+  });
+
+  var used = {};
+  var projectIndices = [];
+  for (var k = 0; k < PROJECTS.length; k++) {
+    var targetAngle = (k / PROJECTS.length) * Math.PI * 2;
+    var best = null, bestDiff = Infinity;
+    equatorial.forEach(function (idx) {
+      if (used[idx]) return;
+      var a = azimuth(points[idx]);
+      var diff = Math.abs(Math.atan2(Math.sin(a - targetAngle), Math.cos(a - targetAngle)));
+      if (diff < bestDiff) { bestDiff = diff; best = idx; }
+    });
+    if (best !== null) { used[best] = true; projectIndices.push(best); }
+  }
+
+  var waxMat = new THREE.MeshStandardMaterial({ color: 0xb5822f, roughness: 0.55, metalness: 0.08 });
+  var waxGeo = new THREE.CylinderGeometry(HEX_R, HEX_R, HEX_R * 0.32, 6);
+  var instanced = new THREE.InstancedMesh(waxGeo, waxMat, COUNT - projectIndices.length);
+  var dummy = new THREE.Object3D();
+  var upv = new THREE.Vector3(0, 1, 0);
+  var instIdx = 0;
+  var projectMeshes = [];
+
+  points.forEach(function (dir, idx) {
+    var pIdx = projectIndices.indexOf(idx);
+    var pos = dir.clone().multiplyScalar(SPHERE_R);
+    if (pIdx !== -1) {
+      var pdata = PROJECTS[pIdx];
+      var mat = new THREE.MeshStandardMaterial({
+        color: 0xe0a94a,
+        emissive: 0x5a3a10,
+        emissiveIntensity: 0.5,
+        roughness: 0.35,
+        metalness: 0.15
+      });
+      var geo = new THREE.CylinderGeometry(HEX_R * 1.12, HEX_R * 1.12, HEX_R * 0.42, 6);
+      var mesh = new THREE.Mesh(geo, mat);
+      mesh.position.copy(pos);
+      mesh.quaternion.setFromUnitVectors(upv, dir);
+      mesh.userData.project = pdata;
+      hive.add(mesh);
+      projectMeshes.push(mesh);
+    } else {
+      dummy.position.copy(pos);
+      dummy.quaternion.setFromUnitVectors(upv, dir);
+      var s = 0.85 + Math.random() * 0.25;
+      dummy.scale.set(s, 1, s);
+      dummy.updateMatrix();
+      instanced.setMatrixAt(instIdx++, dummy.matrix);
+    }
+  });
+  hive.add(instanced);
+
+  function resize() {
+    var w = sceneEl.clientWidth || 1;
+    var h = sceneEl.clientHeight || 1;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h, false);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  var raycaster = new THREE.Raycaster();
+  var mouse = new THREE.Vector2();
+  var hovered = null;
+  var paused = false;
+
+  function pointerAt(clientX, clientY) {
+    var rect = canvas.getBoundingClientRect();
+    mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    var hits = raycaster.intersectObjects(projectMeshes);
+    if (hits.length) {
+      hovered = hits[0].object;
+      paused = true;
+      canvas.style.cursor = 'pointer';
+      tooltip.textContent = hovered.userData.project.name + ' — ' + hovered.userData.project.status;
+      tooltip.style.opacity = '1';
+      tooltip.style.transform = 'translate(' + (clientX - rect.left + 14) + 'px,' + (clientY - rect.top + 10) + 'px)';
+    } else {
+      hovered = null;
+      paused = false;
+      canvas.style.cursor = 'default';
+      tooltip.style.opacity = '0';
+    }
+  }
+
+  canvas.addEventListener('mousemove', function (e) {
+    pointerAt(e.clientX, e.clientY);
+  });
+  canvas.addEventListener('mouseleave', function () {
+    hovered = null;
+    paused = false;
+    canvas.style.cursor = 'default';
+    tooltip.style.opacity = '0';
+  });
+  canvas.addEventListener('click', function () {
+    if (hovered) window.location.href = hovered.userData.project.href;
+  });
+  canvas.addEventListener('touchend', function (e) {
+    if (!e.changedTouches.length) return;
+    var t = e.changedTouches[0];
+    pointerAt(t.clientX, t.clientY);
+    if (hovered) window.location.href = hovered.userData.project.href;
+  });
+
+  var clock = new THREE.Clock();
+  function animate() {
+    requestAnimationFrame(animate);
+    var dt = clock.getDelta();
+    if (!paused && !reduceMotion) {
+      hive.rotation.y += dt * 0.18;
+    }
+    renderer.render(scene, camera);
+  }
+  animate();
+})();
+</script>
 </body>
 </html>
