@@ -188,7 +188,7 @@
   scene.add(hive);
 
   var SPHERE_R = 3.2;
-  var HEX_R = 0.85;
+  var HEX_R = 0.98;
   var COUNT = 64;
 
   var points = [];
@@ -249,7 +249,7 @@
     } else {
       dummy.position.copy(pos);
       dummy.quaternion.setFromUnitVectors(upv, dir);
-      var s = 0.85 + Math.random() * 0.25;
+      var s = 0.96 + Math.random() * 0.1;
       dummy.scale.set(s, 1, s);
       dummy.updateMatrix();
       instanced.setMatrixAt(instIdx++, dummy.matrix);
