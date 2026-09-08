@@ -304,7 +304,8 @@
     canvas.style.cursor = 'default';
     tooltip.style.opacity = '0';
   });
-  canvas.addEventListener('click', function () {
+  canvas.addEventListener('click', function (e) {
+    pointerAt(e.clientX, e.clientY);
     if (hovered) window.location.href = hovered.userData.project.href;
   });
   canvas.addEventListener('touchend', function (e) {
