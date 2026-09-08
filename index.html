@@ -68,31 +68,6 @@
     text-wrap: pretty;
   }
 
-  .callout {
-    display: flex;
-    gap: 0.7rem;
-    align-items: baseline;
-    max-width: 700px;
-    padding: 0.9rem 1.1rem;
-    margin-bottom: 2.5rem;
-    background: var(--accent-soft);
-    border-radius: 3px;
-    font-size: 0.9rem;
-    color: var(--ink);
-  }
-
-  .callout::before {
-    content: "";
-    flex: none;
-    width: 3px;
-    align-self: stretch;
-    background: var(--accent);
-    border-radius: 2px;
-  }
-
-  .callout p { margin: 0; }
-  .callout strong { color: var(--accent); }
-
   .ledger {
     list-style: none;
     margin: 0;
@@ -188,13 +163,14 @@
     white-space: nowrap;
   }
 
-  .sample-flag {
-    position: absolute;
-    top: 1.2rem;
-    right: 1.5rem;
-    font-size: 0.68rem;
-    font-style: italic;
+  .empty-state {
+    grid-column: 1 / -1;
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    border: 1px dashed var(--line);
+    border-radius: 6px;
     color: var(--ink-faint);
+    font-size: 0.92rem;
   }
 
   footer {
@@ -214,59 +190,8 @@
     <p class="tagline">Every project I've designed, collected in one place.</p>
   </header>
 
-  <div class="callout">
-    <p><strong>These three entries are samples.</strong> Swap them for your own projects — tell Claude Code about a new build and it'll add an entry here.</p>
-  </div>
-
   <ul class="ledger">
-    <li class="entry">
-      <span class="sample-flag">sample entry</span>
-      <div class="entry-index">№ 003</div>
-      <div class="entry-body">
-        <h2>Recipe Box</h2>
-        <p>A small web app for saving family recipes and searching them by ingredient instead of scrolling through screenshots.</p>
-        <div class="tags">
-          <span class="tag">React</span>
-          <span class="tag">Vite</span>
-          <span class="tag">SQLite</span>
-        </div>
-      </div>
-      <div class="entry-footer">
-        <span class="status progress">In progress</span>
-        <span class="entry-date">Sep 2026</span>
-      </div>
-    </li>
-    <li class="entry">
-      <span class="sample-flag">sample entry</span>
-      <div class="entry-index">№ 002</div>
-      <div class="entry-body">
-        <h2>Habit Tracker CLI</h2>
-        <p>A terminal app that logs daily habits and streaks to a local database, with a weekly summary printed on demand.</p>
-        <div class="tags">
-          <span class="tag">Python</span>
-          <span class="tag">SQLite</span>
-        </div>
-      </div>
-      <div class="entry-footer">
-        <span class="status shipped">Shipped</span>
-        <span class="entry-date">Aug 2026</span>
-      </div>
-    </li>
-    <li class="entry">
-      <span class="sample-flag">sample entry</span>
-      <div class="entry-index">№ 001</div>
-      <div class="entry-body">
-        <h2>Expense Splitter</h2>
-        <p>A script that divides shared household costs among roommates and emails everyone a summary at month's end.</p>
-        <div class="tags">
-          <span class="tag">Node.js</span>
-        </div>
-      </div>
-      <div class="entry-footer">
-        <span class="status archived">Archived</span>
-        <span class="entry-date">Jun 2026</span>
-      </div>
-    </li>
+    <li class="empty-state">No projects logged yet — the first one goes here.</li>
   </ul>
 
   <footer>
