@@ -494,6 +494,139 @@
     mesh.scale.setScalar(active ? 1.06 : 1);
   }
 
+  // ---------- staging: a soft diorama behind and around the hive --
+  // gradient backdrop, a contact shadow on the ground, a warm light shaft,
+  // and drifting pollen motes. None of this is parented to the `hive`
+  // group -- it stays put while the body sways/bobs/orbits ----------
+
+  function buildVerticalGradientTexture(topColor, bottomColor) {
+    var c = document.createElement('canvas');
+    c.width = 4;
+    c.height = 256;
+    var ctx = c.getContext('2d');
+    var g = ctx.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0, topColor);
+    g.addColorStop(1, bottomColor);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 4, 256);
+    var tex = new THREE.CanvasTexture(c);
+    tex.minFilter = tex.magFilter = THREE.LinearFilter;
+    return tex;
+  }
+
+  // Full-frame quad, deliberately oversized so it covers the frustum at any
+  // aspect ratio without per-resize recomputation. depthTest disabled so it
+  // always renders behind everything regardless of draw order.
+  var backdropTex = buildVerticalGradientTexture(PALETTE.skyTop, PALETTE.skyBottom);
+  var backdropMat = new THREE.MeshBasicMaterial({ map: backdropTex, depthWrite: false, depthTest: false });
+  var backdrop = new THREE.Mesh(new THREE.PlaneGeometry(120, 70), backdropMat);
+  backdrop.position.set(0, 1, -25);
+  backdrop.renderOrder = -1000;
+  scene.add(backdrop);
+
+  function buildRadialShadowTexture() {
+    var c = document.createElement('canvas');
+    c.width = c.height = 256;
+    var ctx = c.getContext('2d');
+    var g = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+    g.addColorStop(0, PALETTE.groundShade);
+    g.addColorStop(1, PALETTE.groundShadeTransparent);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 256, 256);
+    return new THREE.CanvasTexture(c);
+  }
+  var groundShadowTex = buildRadialShadowTexture();
+  var groundShadowMat = new THREE.MeshBasicMaterial({
+    map: groundShadowTex,
+    transparent: true,
+    depthWrite: false
+  });
+  var groundShadow = new THREE.Mesh(
+    new THREE.PlaneGeometry(CONFIG.SPHERE_R * 2.6, CONFIG.SPHERE_R * 1.6),
+    groundShadowMat
+  );
+  groundShadow.rotation.x = -Math.PI / 2;
+  groundShadow.position.y = yNormToWorldY(0) - 0.02;
+  groundShadow.renderOrder = -500;
+  scene.add(groundShadow);
+
+  // Soft warm diagonal quad, additive + low opacity, seated well behind the
+  // hive body (z more negative than the hive's own back edge) so it never
+  // crosses over the front and tints the flat fill.
+  var lightShaft = null;
+  if (!isLowPower) {
+    var shaftMat = new THREE.MeshBasicMaterial({
+      color: 0xfff2c8,
+      transparent: true,
+      opacity: 0.12,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    lightShaft = new THREE.Mesh(new THREE.PlaneGeometry(3.5, 16), shaftMat);
+    lightShaft.position.set(-1.5, 1, -6);
+    lightShaft.rotation.z = Math.PI / 8;
+    lightShaft.rotation.y = Math.PI / 10;
+    lightShaft.renderOrder = -400;
+    scene.add(lightShaft);
+  }
+
+  // Pollen motes: fully disabled under prefers-reduced-motion rather than
+  // just frozen in place, per the plan's non-goals around motion.
+  var pollen = null;
+  var pollenSpeed = null;
+  var pollenDrift = null;
+  var POLLEN_COUNT = CONFIG.pollenCount;
+  if (!reduceMotion) {
+    function buildPollenTexture() {
+      var c = document.createElement('canvas');
+      c.width = c.height = 32;
+      var ctx = c.getContext('2d');
+      var g = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+      g.addColorStop(0, 'rgba(255,238,180,1)');
+      g.addColorStop(1, 'rgba(255,238,180,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 32, 32);
+      return new THREE.CanvasTexture(c);
+    }
+    var pollenGeo = new THREE.BufferGeometry();
+    var pollenPos = new Float32Array(POLLEN_COUNT * 3);
+    pollenSpeed = new Float32Array(POLLEN_COUNT);
+    pollenDrift = new Float32Array(POLLEN_COUNT);
+    for (var pi = 0; pi < POLLEN_COUNT; pi++) {
+      var pang = Math.random() * Math.PI * 2;
+      var prad = Math.random() * CONFIG.SPHERE_R * 2.2;
+      pollenPos[pi * 3] = Math.cos(pang) * prad;
+      pollenPos[pi * 3 + 1] = (Math.random() - 0.3) * HIVE_H * 1.4;
+      pollenPos[pi * 3 + 2] = Math.sin(pang) * prad * 0.6 + (Math.random() - 0.5) * 4;
+      pollenSpeed[pi] = 0.15 + Math.random() * 0.25;
+      pollenDrift[pi] = Math.random() * Math.PI * 2;
+    }
+    pollenGeo.setAttribute('position', new THREE.BufferAttribute(pollenPos, 3));
+    var pollenMat = new THREE.PointsMaterial({
+      color: 0xffe9a8,
+      size: 0.09,
+      map: buildPollenTexture(),
+      transparent: true,
+      opacity: 0.75,
+      depthWrite: false,
+      sizeAttenuation: true
+    });
+    pollen = new THREE.Points(pollenGeo, pollenMat);
+    scene.add(pollen);
+  }
+
+  function updatePollen(dt) {
+    if (!pollen) return;
+    var arr = pollen.geometry.attributes.position.array;
+    for (var qi = 0; qi < POLLEN_COUNT; qi++) {
+      arr[qi * 3 + 1] += pollenSpeed[qi] * dt * 0.3;
+      arr[qi * 3] += Math.sin(elapsed * 0.5 + pollenDrift[qi]) * dt * 0.05;
+      if (arr[qi * 3 + 1] > HIVE_H) arr[qi * 3 + 1] = -HIVE_H * 0.6;
+    }
+    pollen.geometry.attributes.position.needsUpdate = true;
+  }
+
   // ---------- interior of the hive: a smaller inward-facing shell of the
   // same silhouette, walked with project cards floating on its walls ----------
 
@@ -768,6 +901,7 @@
     requestAnimationFrame(animate);
     var dt = clock.getDelta();
     elapsed += dt;
+    updatePollen(dt);
 
     if (mode === 'flying-in' || mode === 'flying-out') {
       flightT = Math.min(1, flightT + dt / FLIGHT_DURATION);
