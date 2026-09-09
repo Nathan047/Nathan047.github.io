@@ -175,9 +175,15 @@
     var pts = EXTERIOR_CONTROL.map(function (p) { return new THREE.Vector3(p[0], p[1], 0); });
     var curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.5);
     var sampled = curve.getPoints(120);
-    return sampled.map(function (v) {
+    // Catmull-Rom can overshoot in x near a sharp seam pinch even though
+    // every control point's y is strictly increasing -- re-sort by y so the
+    // piecewise lookup below is guaranteed a monotonic array to scan,
+    // regardless of any minor curve wobble.
+    var profile = sampled.map(function (v) {
       return { y: THREE.MathUtils.clamp(v.x, 0, 1), r: Math.max(0, v.y) };
     });
+    profile.sort(function (a, b) { return a.y - b.y; });
+    return profile;
   }
   var EXTERIOR_PROFILE = buildExteriorProfile();
 
