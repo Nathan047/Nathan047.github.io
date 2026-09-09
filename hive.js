@@ -435,9 +435,20 @@
     return shape;
   }
 
-  var entranceMat = new THREE.MeshBasicMaterial({ color: PALETTE.archFill });
+  // polygonOffset pulls the decal's rasterized depth toward the camera --
+  // the wrapped epsilon offset alone (a few hundredths of a unit against a
+  // body radius of ~3) isn't reliably enough separation for the depth
+  // buffer at typical camera distances, so without this the decal
+  // z-fights with (and usually loses to) the body surface underneath it.
+  var entranceMat = new THREE.MeshBasicMaterial({
+    color: PALETTE.archFill,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2
+  });
   exteriorMaterials.push(entranceMat);
-  var entranceAzimuth = 0;
+  // Local azimuth 0 sits along +X; the camera looks down -Z at the hive, so
+  // the camera-facing point on the surface is azimuth +PI/2 (see the same
+  // convention used for the badge slot offset below).
+  var entranceAzimuth = Math.PI / 2;
   var entranceBottomWorldY = yNormToWorldY(CONFIG.entranceYNorm);
   var entranceGeo = new THREE.ShapeGeometry(buildEntranceShape());
   wrapShapeToProfile(entranceGeo, entranceAzimuth, entranceBottomWorldY, CONFIG.entranceEpsilon);
@@ -453,8 +464,16 @@
   var badgeR = CONFIG.badgeHexR;
   var badgeBackingR = badgeR + CONFIG.badgeBackingPad;
 
-  var badgeLockedMat = new THREE.MeshBasicMaterial({ color: PALETTE.bodyGold });
-  var badgeBackingMat = new THREE.MeshBasicMaterial({ color: PALETTE.outline });
+  // Same polygonOffset reasoning as the entrance material above. Backing
+  // sits behind the fill, so it gets a smaller (but still nonzero) pull.
+  var badgeLockedMat = new THREE.MeshBasicMaterial({
+    color: PALETTE.bodyGold,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2
+  });
+  var badgeBackingMat = new THREE.MeshBasicMaterial({
+    color: PALETTE.outline,
+    polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1
+  });
   exteriorMaterials.push(badgeLockedMat, badgeBackingMat);
 
   var badgeSlots = [];
@@ -479,7 +498,10 @@
 
     if (activeSlot !== -1 && PROJECTS[activeSlot]) {
       var pdata = PROJECTS[activeSlot];
-      var fillMat = new THREE.MeshBasicMaterial({ color: PALETTE.badgeCream });
+      var fillMat = new THREE.MeshBasicMaterial({
+        color: PALETTE.badgeCream,
+        polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3
+      });
       exteriorMaterials.push(fillMat);
       var fillMesh = new THREE.Mesh(fillGeo, fillMat);
       fillMesh.userData.project = pdata;
