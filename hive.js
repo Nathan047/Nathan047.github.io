@@ -100,7 +100,7 @@
   camera.lookAt(0, 0, 0);
 
   var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isLowPower ? 1.5 : 2));
 
   var cssRenderer = new THREE.CSS3DRenderer();
   cssRenderer.domElement.id = 'hive-css';
