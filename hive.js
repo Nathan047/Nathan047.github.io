@@ -19,8 +19,8 @@
   var PALETTE = {
     outline: 0x23374a,
     bodyGold: 0xe9a83b,
-    badgeCream: 0xffd979,
-    badgeHover: 0xfff0be,
+    badgeCream: 0xfff3d0,
+    badgeHover: 0xffffff,
     archFill: 0x23374a,
     groundShade: 'rgba(12,22,38,0.35)',
     groundShadeTransparent: 'rgba(12,22,38,0)',
@@ -47,15 +47,15 @@
     seamRadialSegments: 10,
 
     badgeCount: 6,
-    badgeHexR: 0.34,
-    badgeBackingPad: 0.07,
+    badgeHexR: 0.42,
+    badgeBackingPad: 0.08,
     badgeEpsilonFill: 0.03,
     badgeEpsilonBacking: 0.012,
     badgeBandYNorm: 0.38,
 
-    entranceYNorm: 0.05,
-    entranceWidth: 0.85,
-    entranceArchY: 0.62,
+    entranceYNorm: 0.07,
+    entranceWidth: 0.95,
+    entranceArchY: 0.68,
     entranceEpsilon: 0.02,
 
     swayAmplitude: THREE.MathUtils.degToRad(12),
@@ -96,7 +96,7 @@
   var scene = new THREE.Scene();
   var cssScene = new THREE.Scene();
   var camera = new THREE.PerspectiveCamera(42, 1, 0.1, 400);
-  camera.position.set(0, 1.5, 12.5);
+  camera.position.set(0, 1.5, 10.5);
   camera.lookAt(0, 0, 0);
 
   var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
@@ -353,7 +353,13 @@
     for (var i = 0; i < pos.count; i++) {
       var sx = pos.getX(i), sy = pos.getY(i);
       var h = centreWorldY + sy;
-      var theta = centreAzimuth + sx / centreR;
+      // Sign matters: with +sx/centreR, the mapping from local shape-space
+      // to world cylindrical coordinates comes out mirrored relative to the
+      // Shape's own winding, which flips every wrapped triangle's normal to
+      // point inward. With MeshBasicMaterial defaulting to FrontSide, that
+      // makes the whole decal backface-culled -- invisible to the camera
+      // *and* invisible to the raycaster, not just hard to see.
+      var theta = centreAzimuth - sx / centreR;
       var r = exteriorRadiusAtWorldY(h) + epsilon;
       pos.setXYZ(i, r * Math.cos(theta), h, r * Math.sin(theta));
     }
@@ -480,9 +486,16 @@
   for (var b = 0; b < CONFIG.badgeCount; b++) {
     badgeSlots.push((b / CONFIG.badgeCount) * Math.PI * 2 + Math.PI * 0.15);
   }
-  // Which slots carry real projects -- spread across the ring rather than
-  // bunched together.
-  var ACTIVE_SLOT_INDICES = [0, 3];
+  // Which slots carry real projects. Slot azimuths are idx*60+27 degrees
+  // (0, 87, 147, 207, 267, 327); the camera faces 90 degrees. A hex badge
+  // wrapped onto a curved surface foreshortens fast as it turns away from
+  // the viewer -- even +-60 degrees off centre (tried [0, 2]) reads as a
+  // near-invisible sliver, so with only two real projects to place,
+  // discoverability on first load wins over spreading them around the
+  // ring: slot 1 sits almost dead-center (87, 3 degrees off) and slot 2
+  // (147, 57 degrees off) is close enough behind it to catch on a slight
+  // sway or a small drag, rather than requiring a real search.
+  var ACTIVE_SLOT_INDICES = [1, 2];
 
   var badgeMeshes = [];
 
@@ -839,7 +852,14 @@
     setBadgeVisualState(mesh, false);
     var targetProject = mesh.userData.project;
     announce(targetProject ? targetProject.name + ' — opening.' : 'Flying into the hive.');
-    mesh.getWorldPosition(lastEntryPoint);
+    // mesh.getWorldPosition() returns the mesh's own Object3D origin, which
+    // is (0,0,0) here -- wrapShapeToProfile bakes the badge/entrance shape
+    // directly into the geometry's vertex positions rather than moving the
+    // mesh itself, so the origin sits at the hive's centre, not on the
+    // hive's surface. Use the geometry's actual bounding-sphere centre
+    // (transformed into world space) as the real fly-through point instead.
+    mesh.geometry.computeBoundingSphere();
+    lastEntryPoint.copy(mesh.geometry.boundingSphere.center).applyMatrix4(mesh.matrixWorld);
     flightFrom.pos.copy(camera.position);
     flightFrom.look.copy(ORBIT_LOOK);
     flightVia.copy(lastEntryPoint);
