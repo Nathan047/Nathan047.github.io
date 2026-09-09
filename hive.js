@@ -39,6 +39,7 @@
     INTERIOR_HEX_R: 0.62,
     INTERIOR_SCALE: 60,
     CARD_SCALE: 0.0012,
+    interiorSpinSpeed: 0.14,  // rad/s, ambient turn while inside -- one full turn ~45s
 
     outlineWidth: 0.055,           // world-space silhouette hull offset
     latheRadialSegments: isLowPower ? 32 : 64,
@@ -690,14 +691,52 @@
   interiorCssGroup.scale.setScalar(INTERIOR_SCALE);
   cssScene.add(interiorCssGroup);
 
+  // Each cap gets a small procedural texture instead of a flat fill -- a
+  // radial gradient reads as a shallow wax cell (dark open mouth, bright
+  // rim, shadowed wall) rather than a painted hexagon, so the 44 tiled
+  // caps read collectively as a honeycomb surface rather than hex-shaped
+  // confetti. ExtrudeGeometry's default cap UVs fit the shape's own
+  // bounding box, so a centred canvas texture lands centred on every cell
+  // without per-mesh UV work.
+  function shadeColor(hex, amt) {
+    var r = (hex >> 16) & 255, g = (hex >> 8) & 255, b = hex & 255;
+    function mix(c) { return Math.max(0, Math.min(255, Math.round(c + (amt > 0 ? (255 - c) : c) * amt))); }
+    return 'rgb(' + mix(r) + ',' + mix(g) + ',' + mix(b) + ')';
+  }
+  function buildCombCellTexture(hex) {
+    var size = 128, cx = size / 2, cy = size / 2;
+    var c = document.createElement('canvas');
+    c.width = c.height = size;
+    var ctx = c.getContext('2d');
+    var g = ctx.createRadialGradient(cx, cy, size * 0.04, cx, cy, size * 0.52);
+    g.addColorStop(0, shadeColor(hex, -0.32));
+    g.addColorStop(0.5, shadeColor(hex, 0.2));
+    g.addColorStop(0.82, shadeColor(hex, -0.04));
+    g.addColorStop(1, shadeColor(hex, -0.42));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    ctx.strokeStyle = 'rgba(18,12,4,0.35)';
+    ctx.lineWidth = size * 0.04;
+    ctx.beginPath();
+    for (var s = 0; s < 6; s++) {
+      var ang = (Math.PI / 3) * s, x = cx + Math.cos(ang) * size * 0.46, y = cy + Math.sin(ang) * size * 0.46;
+      if (s === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    return new THREE.CanvasTexture(c);
+  }
+  var interiorCombTex = buildCombCellTexture(0xd9a53d);
+  var interiorProjectCombTex = buildCombCellTexture(0xffe08a);
+
   // Flat MeshBasicMaterial, coherent with the exterior treatment -- the
   // clearcoat/roughness/emissive photoreal properties from the old
   // MeshPhysicalMaterial versions are dropped since Basic ignores them
   // anyway. Colors kept close to their previous values.
   var interiorRimMat = new THREE.MeshBasicMaterial({ color: 0x7a4e18, transparent: true, opacity: 0 });
-  var interiorCapMat = new THREE.MeshBasicMaterial({ color: 0xd9a53d, transparent: true, opacity: 0 });
+  var interiorCapMat = new THREE.MeshBasicMaterial({ map: interiorCombTex, color: 0xffffff, transparent: true, opacity: 0 });
   var interiorProjectRimMat = new THREE.MeshBasicMaterial({ color: 0xc47a1f, transparent: true, opacity: 0 });
-  var interiorProjectCapMat = new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0 });
+  var interiorProjectCapMat = new THREE.MeshBasicMaterial({ map: interiorProjectCombTex, color: 0xffffff, transparent: true, opacity: 0 });
   // Shared navy backing hex, one instance per interior cell, offset a hair
   // further from the chamber centre (i.e. into the wall, behind the cell
   // as seen from inside) so it peeks out as an outline ring.
@@ -1137,7 +1176,10 @@
         setInteractivity();
       }
     } else if (mode === 'inside') {
-      if (!insideHovering && !reduceMotion) interiorYaw += dt * 0.05;
+      // Keeps turning even while the pointer sits over the scene -- pausing
+      // on hover made it read as static, since the mouse is almost always
+      // over the canvas while you're actually looking at the interior.
+      if (!reduceMotion) interiorYaw += dt * CONFIG.interiorSpinSpeed;
       var yaw = interiorYaw + lookOffset;
       interiorGroup.rotation.y = yaw;
       interiorCssGroup.rotation.y = yaw;
