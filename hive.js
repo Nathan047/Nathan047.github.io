@@ -832,6 +832,13 @@
   }
 
   function startFlightIn(mesh) {
+    // The badge being flown into is whatever pointerAt() or the keyboard
+    // handler last marked "active" (brighter fill + scale pop) -- clear
+    // that here, since neither the fly-in nor fly-out path otherwise
+    // touches it again, and it would otherwise stay lit indefinitely.
+    setBadgeVisualState(mesh, false);
+    var targetProject = mesh.userData.project;
+    announce(targetProject ? targetProject.name + ' — opening.' : 'Flying into the hive.');
     mesh.getWorldPosition(lastEntryPoint);
     flightFrom.pos.copy(camera.position);
     flightFrom.look.copy(ORBIT_LOOK);
@@ -845,7 +852,6 @@
     canvas.style.cursor = 'default';
     tooltip.style.opacity = '0';
 
-    var targetProject = mesh.userData.project;
     interiorCssGroup.children.forEach(function (c) {
       if (c.userData.project === targetProject) interiorYaw = yawToFace(c.userData.dir);
     });
@@ -855,6 +861,7 @@
   }
 
   function startFlightOut() {
+    announce('Returning to the hive.');
     flightFrom.pos.copy(camera.position);
     flightFrom.look.copy(INSIDE_LOOK);
     flightVia.copy(lastEntryPoint);
@@ -863,6 +870,7 @@
     flightT = 0;
     mode = 'flying-out';
     backBtn.classList.remove('visible');
+    backBtn.tabIndex = -1;
     setInteractivity();
   }
 
@@ -1102,6 +1110,7 @@
         if (mode === 'flying-in') {
           mode = 'inside';
           backBtn.classList.add('visible');
+          backBtn.tabIndex = 0;
         } else {
           mode = 'orbit';
         }
