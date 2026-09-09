@@ -1,0 +1,163 @@
+/* ---------- 3D hive ---------- */
+
+/* Palette note: this file duplicates a handful of hex values from the
+   PALETTE const defined in hive.js (outline navy, sky gradient top) purely
+   for the no-JS fallback background below and the focus ring. There is no
+   build step tying the two together, so if PALETTE changes in hive.js this
+   fallback should be updated by hand -- an accepted small duplication cost
+   for staying framework/bundler-free. */
+
+.hive-scene {
+  position: relative;
+  height: 460px;
+  margin-top: 0.5rem;
+  /* Hard fallback so the diorama never reads as a black hole if the
+     backdrop quad fails to render for any reason. Matches PALETTE.skyTop. */
+  background: #16283F;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+#hive-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#hive-canvas:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+
+.hive-live-region {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.hive-tooltip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 0.4rem 0.7rem;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  color: var(--ink);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.hive-caption {
+  margin: 0.5rem 0 0;
+  text-align: center;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+}
+
+.hive-caption a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.hive-caption a:hover { text-decoration: underline; }
+.hive-caption a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (max-width: 640px) {
+  .hive-scene { height: 340px; }
+}
+
+.hive-back {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 3;
+  padding: 0.5rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink-soft);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 0.25s ease, transform 0.25s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.hive-back.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.hive-back:hover { border-color: var(--accent); color: var(--ink); }
+.hive-back:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+#hive-css {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.hive-card {
+  width: 220px;
+  padding: 0.85rem 1rem;
+  background: rgba(23, 41, 67, 0.94);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+  color: var(--ink);
+  font-family: "IBM Plex Sans", sans-serif;
+  text-align: left;
+  backface-visibility: hidden;
+}
+
+.hive-card-label {
+  display: block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  color: var(--ink-faint);
+  margin-bottom: 0.2rem;
+}
+
+.hive-card h3 {
+  margin: 0 0 0.5rem;
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.hive-card-status {
+  display: inline-block;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  margin-bottom: 0.7rem;
+}
+
+.hive-card-link {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.hive-card-link:hover { text-decoration: underline; }
+.hive-card-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
