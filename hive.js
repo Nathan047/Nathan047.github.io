@@ -7,17 +7,76 @@
 
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // Lower-powered / touch devices get a cheaper build: fewer lathe facets,
+  // fewer pollen motes, no light shaft, capped pixel ratio.
+  var isLowPower = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) ||
+    (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+
+  // Flat vector-icon palette. hive.css duplicates a couple of these values
+  // for CSS-only fallbacks (see the comment at the top of that file) --
+  // there is no build step wiring the two together, so keep them in sync
+  // by hand if this changes.
+  var PALETTE = {
+    outline: 0x23374a,
+    bodyGold: 0xe9a83b,
+    badgeCream: 0xffd979,
+    badgeHover: 0xfff0be,
+    archFill: 0x23374a,
+    groundShade: 'rgba(12,22,38,0.35)',
+    groundShadeTransparent: 'rgba(12,22,38,0)',
+    skyTop: '#16283f',
+    skyBottom: '#24405c'
+  };
+
   // Magic numbers hoisted out of the body of the script so every consumer
-  // reads from one place. (Phase 0 refactor -- exterior silhouette numbers
-  // arrive in Phase 1.)
+  // reads from one place.
   var CONFIG = {
     SPHERE_R: 3.2,
-    INTERIOR_Y_SCALE: 1.15,
+    HEIGHT_RATIO: 1.9,        // exterior total height = HEIGHT_RATIO * SPHERE_R
+    INTERIOR_Y_SCALE: 1.15,   // legacy y-scale, interior profile only
     INTERIOR_R: 1.7,
     INTERIOR_COUNT: 44,
     INTERIOR_HEX_R: 0.62,
     INTERIOR_SCALE: 60,
-    CARD_SCALE: 0.0012
+    CARD_SCALE: 0.0012,
+
+    outlineWidth: 0.055,           // world-space silhouette hull offset
+    latheRadialSegments: isLowPower ? 32 : 64,
+    seamTubeRadius: 0.045,
+    seamTubularSegments: 64,
+    seamRadialSegments: 10,
+
+    badgeCount: 6,
+    badgeHexR: 0.34,
+    badgeBackingPad: 0.07,
+    badgeEpsilonFill: 0.03,
+    badgeEpsilonBacking: 0.012,
+    badgeBandYNorm: 0.38,
+
+    entranceYNorm: 0.05,
+    entranceWidth: 0.85,
+    entranceArchY: 0.62,
+    entranceEpsilon: 0.02,
+
+    swayAmplitude: THREE.MathUtils.degToRad(12),
+    swaySpeed: 0.35,
+    swayResumeDelay: 2,
+    bobAmplitude: 0.08,
+    bobSpeed: 1.1,
+
+    // Escape hatch: bump to 2 to try a hard 2-stop toon gradient instead of
+    // a fully flat body material. Not wired to a UI toggle -- change here
+    // and reload to preview. Default 1 = flat MeshBasicMaterial.
+    flatShadeSteps: 1,
+
+    pollenCount: isLowPower ? 40 : 80,
+
+    dragYawSpeed: 0.008,
+    dragPolarSpeed: 0.15,
+    dragDamping: 0.92,
+    orbitPolarMin: -15,
+    orbitPolarMax: 35,
+    tapMoveThreshold: 8
   };
 
   var STATUS_STYLE = {
@@ -47,13 +106,10 @@
   cssRenderer.domElement.id = 'hive-css';
   sceneEl.appendChild(cssRenderer.domElement);
 
+  // Flat MeshBasicMaterial doesn't respond to lights at all -- this ambient
+  // light is kept only so nothing else in the scene graph (if anything ever
+  // needs a lit material again) silently renders black.
   scene.add(new THREE.AmbientLight(0x8fa3c0, 0.85));
-  var key = new THREE.DirectionalLight(0xffd9a0, 0.65);
-  key.position.set(4, 5, 6);
-  scene.add(key);
-  var rim = new THREE.DirectionalLight(0x5577cc, 0.4);
-  rim.position.set(-5, -2, -4);
-  scene.add(rim);
 
   var hive = new THREE.Group();
   hive.rotation.x = -0.18;
@@ -90,10 +146,64 @@
     return 1.0;
   }
 
-  // Temporary alias so the exterior consumers below (lathe, entrance, hex
-  // windows) keep working unchanged during this pure refactor pass. Phase 1
-  // replaces this with a real, independent exterior profile.
-  var hiveProfile = interiorProfile;
+  // ---------- exterior silhouette: independent of the interior profile
+  // above on purpose. This is a stacked-skep outline (small cap + three
+  // bulging bands pinched at the seams) rather than a smooth dome, defined
+  // as (yNorm, r) control points from the base (yNorm=0) to the crown
+  // (yNorm=1), r in units of the max radius. Run through a Catmull-Rom
+  // curve and resampled so the bulges/pinches read as smooth curves rather
+  // than sharp joints. ----------
+  var EXTERIOR_CONTROL = [
+    [0.00, 0.90], // base, flat disc closes it
+    [0.02, 0.90], // bottom rim
+    [0.12, 1.00], // band 3 bulge
+    [0.26, 0.90], // seam A
+    [0.38, 0.93], // band 2 bulge
+    [0.52, 0.80], // seam B
+    [0.62, 0.82], // band 1 bulge
+    [0.74, 0.62], // seam C
+    [0.82, 0.52], // cap bulge
+    [0.95, 0.22], // round toward crown
+    [1.00, 0.00]  // crown point
+  ];
+  // Seam y-positions, exposed separately so the seam rings and the hex
+  // badge band can reference them without re-deriving from the control
+  // array above.
+  var SEAM_Y_NORMS = [0.26, 0.52, 0.74];
+
+  function buildExteriorProfile() {
+    var pts = EXTERIOR_CONTROL.map(function (p) { return new THREE.Vector3(p[0], p[1], 0); });
+    var curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.5);
+    var sampled = curve.getPoints(120);
+    return sampled.map(function (v) {
+      return { y: THREE.MathUtils.clamp(v.x, 0, 1), r: Math.max(0, v.y) };
+    });
+  }
+  var EXTERIOR_PROFILE = buildExteriorProfile();
+
+  // Piecewise-linear lookup over the resampled curve, same shape as
+  // interiorProfile() above but operating on yNorm in [0, 1] rather than
+  // [-1, 1].
+  function exteriorProfile(yNorm) {
+    yNorm = THREE.MathUtils.clamp(yNorm, 0, 1);
+    var pts = EXTERIOR_PROFILE;
+    for (var i = 0; i < pts.length - 1; i++) {
+      var a = pts[i], b = pts[i + 1];
+      if (yNorm >= a.y && yNorm <= b.y) {
+        var span = b.y - a.y;
+        var t = span > 1e-6 ? (yNorm - a.y) / span : 0;
+        return a.r + (b.r - a.r) * t;
+      }
+    }
+    return pts[pts.length - 1].r;
+  }
+
+  var HIVE_H = CONFIG.HEIGHT_RATIO * CONFIG.SPHERE_R; // width:height ~= 1.05:1
+  function yNormToWorldY(yNorm) { return (yNorm - 0.5) * HIVE_H; }
+  function worldYToYNorm(worldY) { return worldY / HIVE_H + 0.5; }
+  function exteriorRadiusAtWorldY(worldY) {
+    return exteriorProfile(worldYToYNorm(worldY)) * CONFIG.SPHERE_R;
+  }
 
   var golden = Math.PI * (3 - Math.sqrt(5));
   function buildHiveDirections(count) {
@@ -175,8 +285,8 @@
   }
 
   // A hard-stepped gradient (not a smooth ramp) is what makes MeshToonMaterial
-  // shade in flat bands instead of a photoreal falloff -- the classic
-  // cel-shaded video-game look. NearestFilter keeps the steps crisp.
+  // shade in flat bands instead of a photoreal falloff. Only used if
+  // CONFIG.flatShadeSteps is bumped to 2 -- unwired by default.
   function buildToonGradient(stops) {
     var canvas = document.createElement('canvas');
     canvas.width = stops.length;
@@ -190,168 +300,199 @@
     tex.minFilter = tex.magFilter = THREE.NearestFilter;
     return tex;
   }
-  var toonGradient = buildToonGradient(['#3a2a12', '#8a5f22', '#d9a53d', '#ffe08a']);
-
-  // A thin black backface shell just outside every exterior mesh, the
-  // standard "inverted hull" trick for a cartoon outline.
-  var outlineMat = new THREE.MeshBasicMaterial({ color: 0x1c1206, side: THREE.BackSide });
-  function addOutline(mesh, scale) {
-    var outline = new THREE.Mesh(mesh.geometry, outlineMat);
-    outline.position.copy(mesh.position);
-    outline.quaternion.copy(mesh.quaternion);
-    outline.scale.copy(mesh.scale).multiplyScalar(scale || 1.045);
-    hive.add(outline);
-    return outline;
+  var twoStepGradient = null;
+  function makeBodyMaterial(colorHex) {
+    if (CONFIG.flatShadeSteps === 2) {
+      if (!twoStepGradient) twoStepGradient = buildToonGradient(['#000000', '#ffffff']);
+      return new THREE.MeshToonMaterial({ color: colorHex, gradientMap: twoStepGradient });
+    }
+    return new THREE.MeshBasicMaterial({ color: colorHex });
   }
-
-  // material index 0 = extruded sides + bevel (the darker rim),
-  // material index 1 = the flat front/back caps (the glossy face)
-  var projectRimMat = new THREE.MeshToonMaterial({ color: 0xc47a1f, gradientMap: toonGradient });
-  var projectCapMat = new THREE.MeshToonMaterial({
-    color: 0xffe08a,
-    emissive: 0x4a2c06,
-    emissiveIntensity: 0.7,
-    gradientMap: toonGradient
-  });
 
   var fwd = new THREE.Vector3(0, 0, 1);
   var projectMeshes = [];
 
-  // ---------- woven straw body: a lathed skep silhouette with coiled
-  // ridges baked into the profile and a procedural straw texture, so the
-  // outside reads as a basket rather than a tiled honeycomb ball ----------
+  // Every material that belongs to the exterior (the flat vector-icon hive
+  // body, its outline, seams, entrance and badges) is collected here as it
+  // is created, so setExteriorOpacity() below can never silently miss one.
+  var exteriorMaterials = [];
 
-  function buildStrawTextures() {
-    var w = 512, h = 512;
-    var colorCanvas = document.createElement('canvas');
-    var bumpCanvas = document.createElement('canvas');
-    colorCanvas.width = bumpCanvas.width = w;
-    colorCanvas.height = bumpCanvas.height = h;
-    var cctx = colorCanvas.getContext('2d');
-    var bctx = bumpCanvas.getContext('2d');
-
-    var grad = cctx.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, '#dfbd74');
-    grad.addColorStop(0.55, '#c69a4e');
-    grad.addColorStop(1, '#a67c3a');
-    cctx.fillStyle = grad;
-    cctx.fillRect(0, 0, w, h);
-    bctx.fillStyle = '#888';
-    bctx.fillRect(0, 0, w, h);
-
-    var bands = 22;
-    for (var i = 0; i < bands; i++) {
-      var y = (i / bands) * h, bh = h / bands;
-      cctx.fillStyle = 'rgba(255,235,180,0.14)';
-      cctx.fillRect(0, y, w, bh * 0.42);
-      cctx.fillStyle = 'rgba(70,45,15,0.16)';
-      cctx.fillRect(0, y + bh * 0.42, w, bh * 0.18);
-      bctx.fillStyle = 'rgba(255,255,255,0.55)';
-      bctx.fillRect(0, y, w, bh * 0.42);
-      bctx.fillStyle = 'rgba(0,0,0,0.55)';
-      bctx.fillRect(0, y + bh * 0.42, w, bh * 0.18);
+  // Offset every vertex of a source geometry outward along its own vertex
+  // normal by a FIXED WORLD-SPACE distance. Used for the silhouette hull --
+  // unlike scale.multiplyScalar(), this gives a uniform line thickness
+  // regardless of local curvature.
+  function offsetGeometryAlongNormals(geo, dist) {
+    var g = geo.clone();
+    g.computeVertexNormals();
+    var pos = g.attributes.position, norm = g.attributes.normal;
+    for (var i = 0; i < pos.count; i++) {
+      pos.setXYZ(i,
+        pos.getX(i) + norm.getX(i) * dist,
+        pos.getY(i) + norm.getY(i) * dist,
+        pos.getZ(i) + norm.getZ(i) * dist);
     }
-
-    for (var n = 0; n < 2400; n++) {
-      var x = Math.random() * w, yy = Math.random() * h;
-      var len = 6 + Math.random() * 16;
-      var ang = Math.random() * 0.5 - 0.25;
-      var light = Math.random() < 0.5;
-      var x2 = x + Math.cos(ang) * len, y2 = yy + Math.sin(ang) * len;
-      cctx.strokeStyle = light ? 'rgba(255,240,205,0.45)' : 'rgba(70,45,15,0.4)';
-      cctx.lineWidth = 1;
-      cctx.beginPath(); cctx.moveTo(x, yy); cctx.lineTo(x2, y2); cctx.stroke();
-      bctx.strokeStyle = light ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)';
-      bctx.lineWidth = 1;
-      bctx.beginPath(); bctx.moveTo(x, yy); bctx.lineTo(x2, y2); bctx.stroke();
-    }
-
-    var colorTex = new THREE.CanvasTexture(colorCanvas);
-    var bumpTex = new THREE.CanvasTexture(bumpCanvas);
-    [colorTex, bumpTex].forEach(function (t) {
-      t.wrapS = t.wrapT = THREE.RepeatWrapping;
-      t.repeat.set(10, 7);
-    });
-    return { map: colorTex, bumpMap: bumpTex };
+    pos.needsUpdate = true;
+    return g;
   }
 
+  // Wrap a flat 2D shape (built with shape-x = arc-length around the axis,
+  // shape-y = height, both in world units, centred on 0,0) onto the
+  // exterior silhouette at a given azimuth/height. Small shapes only --
+  // the arc-length-to-angle conversion uses the profile radius AT the
+  // shape's centre height as a constant, which is a good approximation for
+  // anything not spanning a big chunk of the circumference.
+  function wrapShapeToProfile(shapeGeo, centreAzimuth, centreWorldY, epsilon) {
+    var pos = shapeGeo.attributes.position;
+    var centreR = Math.max(0.05, exteriorRadiusAtWorldY(centreWorldY));
+    for (var i = 0; i < pos.count; i++) {
+      var sx = pos.getX(i), sy = pos.getY(i);
+      var h = centreWorldY + sy;
+      var theta = centreAzimuth + sx / centreR;
+      var r = exteriorRadiusAtWorldY(h) + epsilon;
+      pos.setXYZ(i, r * Math.cos(theta), h, r * Math.sin(theta));
+    }
+    pos.needsUpdate = true;
+    shapeGeo.computeVertexNormals();
+    return shapeGeo;
+  }
+
+  // ---------- exterior body: a lathed skep silhouette in flat body gold,
+  // with a separate inverted-hull outline mesh and three seam rings drawn
+  // as lines rather than shaded geometry ----------
 
   var LATHE_SAMPLES = 96;
-  var RING_COUNT = 16;
-  var RING_AMPLITUDE = 0.045;
-  // Built bottom-to-top: LatheGeometry derives outward-facing normals from
-  // the winding direction of the profile, and a top-to-bottom order left
-  // the whole shell shaded as if lit from inside.
+  var latheSegments = CONFIG.latheRadialSegments;
+  // Built bottom-to-top (yNorm 0 -> 1): LatheGeometry derives outward-facing
+  // normals from the winding direction of the profile, and a top-to-bottom
+  // order would leave the whole shell shaded as if lit from inside.
   var latheProfile = [];
-  for (var li = LATHE_SAMPLES; li >= 0; li--) {
-    var ly = 1 - (li / LATHE_SAMPLES) * 2.05;
-    var baseR = hiveProfile(Math.max(-1, Math.min(1, ly)));
-    var ridge = RING_AMPLITUDE * Math.sin(ly * RING_COUNT * Math.PI);
-    var lr = Math.max(0.001, baseR + ridge) * SPHERE_R;
-    latheProfile.push(new THREE.Vector2(lr, ly * CONFIG.INTERIOR_Y_SCALE * SPHERE_R));
+  for (var li = 0; li <= LATHE_SAMPLES; li++) {
+    var yN = li / LATHE_SAMPLES;
+    var lr = exteriorProfile(yN) * SPHERE_R;
+    latheProfile.push(new THREE.Vector2(Math.max(0, lr), yNormToWorldY(yN)));
   }
-  // Close with a short inward taper into a flat base board, rather than
-  // tapering all the way to a point -- real skeps sit on a board, they
-  // don't come to an egg-like tip.
-  var baseEdge = latheProfile[0];
-  var baseBoardR = baseEdge.x * 0.88;
-  var baseBoardY = baseEdge.y - 0.05 * SPHERE_R;
-  latheProfile.unshift(new THREE.Vector2(baseBoardR, baseBoardY));
 
-  var strawTex = buildStrawTextures();
-  var strawMat = new THREE.MeshToonMaterial({
-    map: strawTex.map,
-    bumpMap: strawTex.bumpMap,
-    bumpScale: 0.6,
-    gradientMap: toonGradient
-  });
-  var latheMesh = new THREE.Mesh(new THREE.LatheGeometry(latheProfile, 48), strawMat);
+  var bodyMat = makeBodyMaterial(PALETTE.bodyGold);
+  exteriorMaterials.push(bodyMat);
+  var latheGeo = new THREE.LatheGeometry(latheProfile, latheSegments);
+  var latheMesh = new THREE.Mesh(latheGeo, bodyMat);
   hive.add(latheMesh);
-  addOutline(latheMesh, 1.035);
 
-  var baseBoardMat = new THREE.MeshToonMaterial({ color: 0x6b4a26, gradientMap: toonGradient });
-  var baseBoard = new THREE.Mesh(new THREE.CircleGeometry(baseBoardR, 48), baseBoardMat);
-  baseBoard.rotation.x = Math.PI / 2;
-  baseBoard.position.y = baseBoardY;
-  hive.add(baseBoard);
+  // Flat disc closes the bottom -- no base board, just enough geometry to
+  // not see through the hive from below.
+  var baseR = exteriorProfile(0) * SPHERE_R;
+  var baseDisc = new THREE.Mesh(new THREE.CircleGeometry(baseR, latheSegments), bodyMat);
+  baseDisc.rotation.x = Math.PI / 2;
+  baseDisc.position.y = yNormToWorldY(0);
+  hive.add(baseDisc);
 
-  // a dark entrance gap near the base, like a real skep
-  var entranceY = -0.62;
-  var entranceR = hiveProfile(entranceY) * SPHERE_R;
-  var entranceNormal = new THREE.Vector3(1, 0, 0);
-  var entrancePos = new THREE.Vector3(entranceR, entranceY * CONFIG.INTERIOR_Y_SCALE * SPHERE_R, 0);
-  var entranceOuterMat = new THREE.MeshToonMaterial({ color: 0x3a2a12, gradientMap: toonGradient });
-  var entranceInnerMat = new THREE.MeshToonMaterial({ color: 0x0c0805, gradientMap: toonGradient });
-  var entranceOuter = new THREE.Mesh(new THREE.CircleGeometry(0.34, 24), entranceOuterMat);
-  entranceOuter.position.copy(entrancePos).addScaledVector(entranceNormal, 0.01);
-  entranceOuter.quaternion.setFromUnitVectors(fwd, entranceNormal);
-  hive.add(entranceOuter);
-  var entranceInner = new THREE.Mesh(new THREE.CircleGeometry(0.2, 24), entranceInnerMat);
-  entranceInner.position.copy(entrancePos).addScaledVector(entranceNormal, 0.02);
-  entranceInner.quaternion.copy(entranceOuter.quaternion);
-  hive.add(entranceInner);
-
-  // glowing hex windows set into the woven wall, one per project
-  var WINDOW_R = 0.42;
-  var WINDOW_Y = 0;
-  var windowProfileR = hiveProfile(WINDOW_Y) * SPHERE_R;
-  var windowWorldY = WINDOW_Y * CONFIG.INTERIOR_Y_SCALE * SPHERE_R;
-  var windowMeshes = [];
-
-  PROJECTS.forEach(function (pdata, k) {
-    var az = (k / PROJECTS.length) * Math.PI * 2 + 0.4;
-    var outward = new THREE.Vector3(Math.cos(az), 0, Math.sin(az));
-    var pos = new THREE.Vector3(outward.x * windowProfileR, windowWorldY, outward.z * windowProfileR);
-    var geo = hexGeo(WINDOW_R);
-    var mesh = new THREE.Mesh(geo, [projectCapMat, projectRimMat]);
-    mesh.position.copy(pos).addScaledVector(outward, 0.05);
-    mesh.quaternion.setFromUnitVectors(fwd, outward);
-    mesh.userData.project = pdata;
-    hive.add(mesh);
-    addOutline(mesh, 1.12);
-    projectMeshes.push(mesh);
-    windowMeshes.push(mesh);
+  // Bold uniform navy silhouette: an inverted hull offset a fixed
+  // world-space distance outward, rendered back-face-only so it only shows
+  // past the body's own edges.
+  var outlineMat = new THREE.MeshBasicMaterial({
+    color: PALETTE.outline,
+    side: THREE.BackSide,
+    depthWrite: false
   });
+  exteriorMaterials.push(outlineMat);
+  var hullOutline = new THREE.Mesh(offsetGeometryAlongNormals(latheGeo, CONFIG.outlineWidth), outlineMat);
+  hive.add(hullOutline);
+
+  // Band seams: a navy ring seated in each pinch groove so it reads as a
+  // drawn line rather than a bead.
+  var seamRingMat = new THREE.MeshBasicMaterial({ color: PALETTE.outline });
+  exteriorMaterials.push(seamRingMat);
+  SEAM_Y_NORMS.forEach(function (yN) {
+    var r = exteriorProfile(yN) * SPHERE_R;
+    var torus = new THREE.Mesh(
+      new THREE.TorusGeometry(r, CONFIG.seamTubeRadius, CONFIG.seamRadialSegments, CONFIG.seamTubularSegments),
+      seamRingMat
+    );
+    torus.rotation.x = Math.PI / 2;
+    torus.position.y = yNormToWorldY(yN);
+    hive.add(torus);
+  });
+
+  // ---------- entrance arch: a curved decal wrapped onto band 3, low on
+  // the front of the hive. Solid navy fill only -- a navy backing ring
+  // against navy fill would be invisible, and a navy hole read directly
+  // against the gold body already looks correct on its own ----------
+
+  function buildEntranceShape() {
+    var w = CONFIG.entranceWidth, archY = CONFIG.entranceArchY, r = w / 2;
+    var shape = new THREE.Shape();
+    shape.moveTo(-w / 2, 0);
+    shape.lineTo(-w / 2, archY);
+    shape.absarc(0, archY, r, Math.PI, 0, true);
+    shape.lineTo(w / 2, 0);
+    shape.closePath();
+    return shape;
+  }
+
+  var entranceMat = new THREE.MeshBasicMaterial({ color: PALETTE.archFill });
+  exteriorMaterials.push(entranceMat);
+  var entranceAzimuth = 0;
+  var entranceBottomWorldY = yNormToWorldY(CONFIG.entranceYNorm);
+  var entranceGeo = new THREE.ShapeGeometry(buildEntranceShape());
+  wrapShapeToProfile(entranceGeo, entranceAzimuth, entranceBottomWorldY, CONFIG.entranceEpsilon);
+  var entranceMesh = new THREE.Mesh(entranceGeo, entranceMat);
+  hive.add(entranceMesh);
+
+  // ---------- hex badges: six evenly-spaced slots on the middle band
+  // (band 2). Two carry real projects (cream fill, clickable); four are
+  // decorative "locked" cells padding out the ring (body-gold fill, navy
+  // outline only, unclickable, excluded from the raycast target array) ----------
+
+  var badgeCenterWorldY = yNormToWorldY(CONFIG.badgeBandYNorm);
+  var badgeR = CONFIG.badgeHexR;
+  var badgeBackingR = badgeR + CONFIG.badgeBackingPad;
+
+  var badgeLockedMat = new THREE.MeshBasicMaterial({ color: PALETTE.bodyGold });
+  var badgeBackingMat = new THREE.MeshBasicMaterial({ color: PALETTE.outline });
+  exteriorMaterials.push(badgeLockedMat, badgeBackingMat);
+
+  var badgeSlots = [];
+  for (var b = 0; b < CONFIG.badgeCount; b++) {
+    badgeSlots.push((b / CONFIG.badgeCount) * Math.PI * 2 + Math.PI * 0.15);
+  }
+  // Which slots carry real projects -- spread across the ring rather than
+  // bunched together.
+  var ACTIVE_SLOT_INDICES = [0, 3];
+
+  var badgeMeshes = [];
+
+  badgeSlots.forEach(function (az, idx) {
+    var backingGeo = new THREE.ShapeGeometry(hexShape(badgeBackingR));
+    wrapShapeToProfile(backingGeo, az, badgeCenterWorldY, CONFIG.badgeEpsilonBacking);
+    var backingMesh = new THREE.Mesh(backingGeo, badgeBackingMat);
+    hive.add(backingMesh);
+
+    var activeSlot = ACTIVE_SLOT_INDICES.indexOf(idx);
+    var fillGeo = new THREE.ShapeGeometry(hexShape(badgeR));
+    wrapShapeToProfile(fillGeo, az, badgeCenterWorldY, CONFIG.badgeEpsilonFill);
+
+    if (activeSlot !== -1 && PROJECTS[activeSlot]) {
+      var pdata = PROJECTS[activeSlot];
+      var fillMat = new THREE.MeshBasicMaterial({ color: PALETTE.badgeCream });
+      exteriorMaterials.push(fillMat);
+      var fillMesh = new THREE.Mesh(fillGeo, fillMat);
+      fillMesh.userData.project = pdata;
+      fillMesh.userData.isBadge = true;
+      hive.add(fillMesh);
+      projectMeshes.push(fillMesh);
+      badgeMeshes.push(fillMesh);
+    } else {
+      var lockedMesh = new THREE.Mesh(fillGeo, badgeLockedMat);
+      hive.add(lockedMesh);
+      badgeMeshes.push(lockedMesh);
+    }
+  });
+
+  function setBadgeVisualState(mesh, active) {
+    if (!mesh || !mesh.userData.isBadge) return;
+    mesh.material.color.set(active ? PALETTE.badgeHover : PALETTE.badgeCream);
+    mesh.scale.setScalar(active ? 1.06 : 1);
+  }
 
   // ---------- interior of the hive: a smaller inward-facing shell of the
   // same silhouette, walked with project cards floating on its walls ----------
@@ -441,13 +582,15 @@
     }
   });
 
+  // Iterates the exteriorMaterials array collected at build time, rather
+  // than naming individual materials by hand -- fixes a bug in the
+  // original version of this function, which enumerated specific materials
+  // by name and would silently miss any new one added later.
   function setExteriorOpacity(op) {
-    strawMat.transparent = true; strawMat.opacity = op;
-    projectRimMat.transparent = true; projectCapMat.transparent = true;
-    projectRimMat.opacity = op; projectCapMat.opacity = op;
-    entranceOuterMat.transparent = true; entranceInnerMat.transparent = true;
-    entranceOuterMat.opacity = op; entranceInnerMat.opacity = op;
-    baseBoardMat.transparent = true; baseBoardMat.opacity = op;
+    exteriorMaterials.forEach(function (m) {
+      m.transparent = true;
+      m.opacity = op;
+    });
     hive.visible = op > 0.001;
   }
 
@@ -473,6 +616,8 @@
   var mouse = new THREE.Vector2();
   var hovered = null;
   var paused = false;
+  var swayPhase = 0;
+  var orbitYaw = 0; // user-controlled base yaw, driven by drag-orbit in Phase 4
 
   // ---------- fly-in / fly-out camera choreography ----------
 
@@ -563,13 +708,18 @@
     raycaster.setFromCamera(mouse, camera);
     var hits = raycaster.intersectObjects(projectMeshes);
     if (hits.length) {
-      hovered = hits[0].object;
+      if (hovered !== hits[0].object) {
+        setBadgeVisualState(hovered, false);
+        hovered = hits[0].object;
+        setBadgeVisualState(hovered, true);
+      }
       paused = true;
       canvas.style.cursor = 'pointer';
       tooltip.textContent = hovered.userData.project.name + ' — ' + hovered.userData.project.status;
       tooltip.style.opacity = '1';
       tooltip.style.transform = 'translate(' + (clientX - rect.left + 14) + 'px,' + (clientY - rect.top + 10) + 'px)';
     } else {
+      setBadgeVisualState(hovered, false);
       hovered = null;
       paused = false;
       canvas.style.cursor = 'default';
@@ -589,6 +739,7 @@
   canvas.addEventListener('mouseleave', function () {
     lookOffset = 0;
     if (mode !== 'orbit') return;
+    setBadgeVisualState(hovered, false);
     hovered = null;
     paused = false;
     canvas.style.cursor = 'default';
@@ -651,13 +802,16 @@
       interiorGroup.rotation.y = yaw;
       interiorCssGroup.rotation.y = yaw;
     } else {
-      if (!paused && !reduceMotion) {
-        hive.rotation.y += dt * 0.18;
-      }
+      // Flat MeshBasicMaterial looks identical from every yaw angle on a
+      // rotationally-symmetric lathe under a full spin, so idle motion is a
+      // gentle yaw sway instead -- the drag-orbit controls (added later)
+      // let a visitor rotate past it to see the badges on other sides.
+      var swayActive = !paused && !reduceMotion;
+      if (swayActive) swayPhase += dt * CONFIG.swaySpeed;
+      var swayOffset = swayActive ? Math.sin(swayPhase) * CONFIG.swayAmplitude : 0;
+      hive.rotation.y = orbitYaw + swayOffset;
       if (!reduceMotion) {
-        hive.position.y = Math.sin(elapsed * 1.1) * 0.08;
-        var glow = 0.7 + Math.sin(elapsed * 2.2) * 0.25;
-        projectCapMat.emissiveIntensity = glow;
+        hive.position.y = Math.sin(elapsed * CONFIG.bobSpeed) * CONFIG.bobAmplitude;
       }
     }
 
