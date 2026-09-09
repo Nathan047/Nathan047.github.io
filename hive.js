@@ -754,7 +754,13 @@
   var hovered = null;
   var paused = false;
   var swayPhase = 0;
-  var orbitYaw = 0; // user-controlled base yaw, driven by drag-orbit in Phase 4
+  var orbitYaw = 0;      // user-controlled base yaw, from drag-orbit / keyboard
+  var orbitPolarDeg = 0; // user-controlled polar tilt, clamped orbitPolarMin..Max
+  var dragYawVel = 0;
+  var dragPolarVel = 0;
+  var isDragging = false;
+  var lastInputTime = -Infinity;
+  var yawTween = null; // { from, to, t } -- keyboard-triggered yaw animation
 
   // ---------- fly-in / fly-out camera choreography ----------
 
@@ -837,13 +843,18 @@
     startFlightOut();
   });
 
+  // Entrance arch is an optional second fly-in affordance (null-project
+  // target) -- included in the raycast set but not in projectMeshes, so it
+  // isn't reachable via the Left/Right keyboard badge cycle.
+  var raycastTargets = projectMeshes.concat([entranceMesh]);
+
   function pointerAt(clientX, clientY) {
     if (mode !== 'orbit') return;
     var rect = canvas.getBoundingClientRect();
     mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
     mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
-    var hits = raycaster.intersectObjects(projectMeshes);
+    var hits = raycaster.intersectObjects(raycastTargets);
     if (hits.length) {
       if (hovered !== hits[0].object) {
         setBadgeVisualState(hovered, false);
@@ -852,7 +863,9 @@
       }
       paused = true;
       canvas.style.cursor = 'pointer';
-      tooltip.textContent = hovered.userData.project.name + ' — ' + hovered.userData.project.status;
+      tooltip.textContent = hovered.userData.project
+        ? hovered.userData.project.name + ' — ' + hovered.userData.project.status
+        : 'Fly into the hive';
       tooltip.style.opacity = '1';
       tooltip.style.transform = 'translate(' + (clientX - rect.left + 14) + 'px,' + (clientY - rect.top + 10) + 'px)';
     } else {
@@ -864,6 +877,68 @@
     }
   }
 
+  // ---------- drag-to-orbit with inertia ----------
+  // Pointer drag: X drags yaw, Y drags polar angle (clamped). No zoom.
+  // A short tap (movement under CONFIG.tapMoveThreshold) still counts as a
+  // click/tap-to-select; a real drag suppresses the following click so
+  // dragging the hive around never accidentally flies into a badge.
+  var dragState = { active: false, startX: 0, startY: 0, lastX: 0, lastY: 0, moved: false };
+  var suppressClick = false;
+
+  function dragStart(x, y) {
+    if (mode !== 'orbit') return;
+    dragState.active = true;
+    dragState.moved = false;
+    dragState.startX = dragState.lastX = x;
+    dragState.startY = dragState.lastY = y;
+    isDragging = true;
+    dragYawVel = 0;
+    dragPolarVel = 0;
+    yawTween = null;
+  }
+  function dragMove(x, y) {
+    if (!dragState.active) return;
+    var dx = x - dragState.lastX;
+    var dy = y - dragState.lastY;
+    if (!dragState.moved &&
+      (Math.abs(x - dragState.startX) > CONFIG.tapMoveThreshold ||
+       Math.abs(y - dragState.startY) > CONFIG.tapMoveThreshold)) {
+      dragState.moved = true;
+      setBadgeVisualState(hovered, false);
+      hovered = null;
+      tooltip.style.opacity = '0';
+    }
+    if (dragState.moved) {
+      var yawDelta = dx * CONFIG.dragYawSpeed;
+      var polarDelta = -dy * CONFIG.dragPolarSpeed;
+      orbitYaw += yawDelta;
+      orbitPolarDeg = THREE.MathUtils.clamp(orbitPolarDeg + polarDelta, CONFIG.orbitPolarMin, CONFIG.orbitPolarMax);
+      dragYawVel = yawDelta;
+      dragPolarVel = polarDelta;
+      lastInputTime = elapsed;
+    }
+    dragState.lastX = x;
+    dragState.lastY = y;
+  }
+  function dragEnd() {
+    if (!dragState.active) return;
+    dragState.active = false;
+    isDragging = false;
+    lastInputTime = elapsed;
+    if (dragState.moved) suppressClick = true;
+  }
+
+  canvas.addEventListener('mousedown', function (e) {
+    if (mode !== 'orbit') return;
+    dragStart(e.clientX, e.clientY);
+  });
+  window.addEventListener('mousemove', function (e) {
+    if (dragState.active) dragMove(e.clientX, e.clientY);
+  });
+  window.addEventListener('mouseup', function () {
+    dragEnd();
+  });
+
   canvas.addEventListener('mousemove', function (e) {
     if (mode === 'inside') {
       var rect = canvas.getBoundingClientRect();
@@ -871,6 +946,7 @@
       lookOffset = -nx * 0.6;
       return;
     }
+    if (dragState.active) return;
     pointerAt(e.clientX, e.clientY);
   });
   canvas.addEventListener('mouseleave', function () {
@@ -883,12 +959,27 @@
     tooltip.style.opacity = '0';
   });
   canvas.addEventListener('click', function (e) {
+    if (suppressClick) { suppressClick = false; return; }
     if (mode !== 'orbit') return;
     pointerAt(e.clientX, e.clientY);
     if (hovered) startFlightIn(hovered);
   });
+
+  canvas.addEventListener('touchstart', function (e) {
+    if (mode !== 'orbit' || !e.touches.length) return;
+    var t = e.touches[0];
+    dragStart(t.clientX, t.clientY);
+  }, { passive: true });
+  canvas.addEventListener('touchmove', function (e) {
+    if (!dragState.active || !e.touches.length) return;
+    var t = e.touches[0];
+    dragMove(t.clientX, t.clientY);
+  }, { passive: true });
   canvas.addEventListener('touchend', function (e) {
     if (mode !== 'orbit' || !e.changedTouches.length) return;
+    var wasDrag = dragState.moved;
+    dragEnd();
+    if (wasDrag) return;
     var t = e.changedTouches[0];
     pointerAt(t.clientX, t.clientY);
     if (hovered) startFlightIn(hovered);
@@ -896,6 +987,60 @@
 
   sceneEl.addEventListener('mouseenter', function () { insideHovering = true; });
   sceneEl.addEventListener('mouseleave', function () { insideHovering = false; });
+
+  // ---------- keyboard navigation ----------
+  // Left/Right cycles the active (real-project) badges, yaw-animating the
+  // hive so the selected one faces the camera. Enter/Space flies in,
+  // Escape flies back out while inside.
+  var liveRegion = document.getElementById('hive-live');
+  function announce(text) {
+    if (liveRegion) liveRegion.textContent = text;
+  }
+
+  function badgeAzimuth(mesh) {
+    return Math.atan2(mesh.position.z, mesh.position.x);
+  }
+
+  // Rotating the hive group by rotation.y = theta shifts every point's
+  // effective azimuth by -theta (see Ry matrix), so to bring a badge at
+  // local azimuth phi to face the camera (+Z, azimuth pi/2) we need
+  // theta = phi - pi/2. Animated via the shortest angular path.
+  function animateYawTo(targetYaw) {
+    var current = orbitYaw;
+    var delta = ((targetYaw - current + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+    yawTween = { from: current, to: current + delta, t: 0 };
+    lastInputTime = elapsed;
+  }
+
+  var keyboardIndex = -1;
+
+  canvas.addEventListener('keydown', function (e) {
+    if (mode === 'orbit') {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        if (!projectMeshes.length) return;
+        e.preventDefault();
+        if (keyboardIndex >= 0 && projectMeshes[keyboardIndex]) {
+          setBadgeVisualState(projectMeshes[keyboardIndex], false);
+        }
+        var dir = e.key === 'ArrowRight' ? 1 : -1;
+        keyboardIndex = ((keyboardIndex < 0 ? 0 : keyboardIndex + dir) + projectMeshes.length) % projectMeshes.length;
+        var mesh = projectMeshes[keyboardIndex];
+        setBadgeVisualState(mesh, true);
+        animateYawTo(badgeAzimuth(mesh) - Math.PI / 2);
+        announce(mesh.userData.project.name + ' — ' + mesh.userData.project.status + '. Press Enter to open.');
+      } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+        if (keyboardIndex >= 0 && projectMeshes[keyboardIndex]) {
+          e.preventDefault();
+          startFlightIn(projectMeshes[keyboardIndex]);
+        }
+      }
+    } else if (mode === 'inside') {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        startFlightOut();
+      }
+    }
+  });
 
   var lookPoint = new THREE.Vector3();
 
@@ -940,14 +1085,36 @@
       interiorGroup.rotation.y = yaw;
       interiorCssGroup.rotation.y = yaw;
     } else {
+      // Keyboard-triggered yaw animation takes priority over inertia.
+      if (yawTween) {
+        yawTween.t += dt / 0.6;
+        if (yawTween.t >= 1) {
+          orbitYaw = yawTween.to;
+          yawTween = null;
+        } else {
+          orbitYaw = yawTween.from + (yawTween.to - yawTween.from) * easeInOutCubic(yawTween.t);
+        }
+      } else if (!isDragging) {
+        // Inertia: keep coasting on the last drag velocity, damping toward
+        // zero rather than stopping dead the instant the pointer lifts.
+        orbitYaw += dragYawVel;
+        orbitPolarDeg = THREE.MathUtils.clamp(orbitPolarDeg + dragPolarVel, CONFIG.orbitPolarMin, CONFIG.orbitPolarMax);
+        var damping = Math.pow(CONFIG.dragDamping, Math.max(dt * 60, 0.0001));
+        dragYawVel *= damping;
+        dragPolarVel *= damping;
+      }
+
       // Flat MeshBasicMaterial looks identical from every yaw angle on a
       // rotationally-symmetric lathe under a full spin, so idle motion is a
-      // gentle yaw sway instead -- the drag-orbit controls (added later)
-      // let a visitor rotate past it to see the badges on other sides.
-      var swayActive = !paused && !reduceMotion;
+      // gentle yaw sway instead -- drag-orbit lets a visitor rotate past it
+      // to see the badges on other sides. Sway resumes a couple of seconds
+      // after the last drag/keyboard input, not immediately.
+      var idleFor = elapsed - lastInputTime;
+      var swayActive = !paused && !reduceMotion && !isDragging && !yawTween && idleFor > CONFIG.swayResumeDelay;
       if (swayActive) swayPhase += dt * CONFIG.swaySpeed;
       var swayOffset = swayActive ? Math.sin(swayPhase) * CONFIG.swayAmplitude : 0;
       hive.rotation.y = orbitYaw + swayOffset;
+      hive.rotation.x = -0.18 + THREE.MathUtils.degToRad(orbitPolarDeg);
       if (!reduceMotion) {
         hive.position.y = Math.sin(elapsed * CONFIG.bobSpeed) * CONFIG.bobAmplitude;
       }

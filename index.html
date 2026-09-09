@@ -87,12 +87,13 @@
   </header>
 
   <div class="hive-scene" id="hive-scene">
-    <canvas id="hive-canvas"></canvas>
+    <canvas id="hive-canvas" tabindex="0" role="img" aria-label="Interactive 3D beehive. Drag to rotate, or use the arrow keys to browse projects and Enter to open one."></canvas>
     <div class="hive-tooltip" id="hive-tooltip"></div>
     <button type="button" class="hive-back" id="hive-back">← Back to the hive</button>
+    <div class="hive-live-region" id="hive-live" aria-live="polite"></div>
   </div>
   <p class="hive-caption">
-    Hover to pause the hive, click a glowing cell to fly inside — or jump straight to
+    Drag to rotate, hover or use the arrow keys to browse, click/Enter a glowing cell to fly inside — or jump straight to
     <a href="/to-do-list/">To-Do List</a> · <a href="/fpl/">FPL Team Manager</a>.
   </p>
 
