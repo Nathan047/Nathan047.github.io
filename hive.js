@@ -649,21 +649,19 @@
   interiorCssGroup.scale.setScalar(INTERIOR_SCALE);
   cssScene.add(interiorCssGroup);
 
-  var interiorRimMat = new THREE.MeshStandardMaterial({ color: 0x7a4e18, roughness: 0.7, metalness: 0.05, transparent: true, opacity: 0 });
-  var interiorCapMat = new THREE.MeshPhysicalMaterial({ color: 0xd9a53d, roughness: 0.45, metalness: 0.05, clearcoat: 0.3, clearcoatRoughness: 0.5, transparent: true, opacity: 0 });
-  var interiorProjectRimMat = new THREE.MeshStandardMaterial({ color: 0xc47a1f, roughness: 0.5, metalness: 0.08, transparent: true, opacity: 0 });
-  var interiorProjectCapMat = new THREE.MeshPhysicalMaterial({
-    color: 0xffe08a,
-    emissive: 0x4a2c06,
-    emissiveIntensity: 0.5,
-    roughness: 0.28,
-    metalness: 0.05,
-    clearcoat: 0.65,
-    clearcoatRoughness: 0.3,
-    transparent: true,
-    opacity: 0
-  });
-  var interiorMaterials = [interiorRimMat, interiorCapMat, interiorProjectRimMat, interiorProjectCapMat];
+  // Flat MeshBasicMaterial, coherent with the exterior treatment -- the
+  // clearcoat/roughness/emissive photoreal properties from the old
+  // MeshPhysicalMaterial versions are dropped since Basic ignores them
+  // anyway. Colors kept close to their previous values.
+  var interiorRimMat = new THREE.MeshBasicMaterial({ color: 0x7a4e18, transparent: true, opacity: 0 });
+  var interiorCapMat = new THREE.MeshBasicMaterial({ color: 0xd9a53d, transparent: true, opacity: 0 });
+  var interiorProjectRimMat = new THREE.MeshBasicMaterial({ color: 0xc47a1f, transparent: true, opacity: 0 });
+  var interiorProjectCapMat = new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0 });
+  // Shared navy backing hex, one instance per interior cell, offset a hair
+  // further from the chamber centre (i.e. into the wall, behind the cell
+  // as seen from inside) so it peeks out as an outline ring.
+  var interiorBackingMat = new THREE.MeshBasicMaterial({ color: PALETTE.outline, transparent: true, opacity: 0 });
+  var interiorMaterials = [interiorRimMat, interiorCapMat, interiorProjectRimMat, interiorProjectCapMat, interiorBackingMat];
 
   var interiorPoints = buildHiveDirections(INTERIOR_COUNT);
   var interiorProjectIndices = pickProjectIndices(interiorPoints, PROJECTS);
@@ -689,6 +687,12 @@
     var pos = dir.clone().multiplyScalar(INTERIOR_R);
     var inwardDir = dir.clone().normalize().multiplyScalar(-1);
     var r = Math.min(interiorNearestDist[idx] * 0.497, INTERIOR_HEX_R);
+
+    var backingGeo = new THREE.ShapeGeometry(hexShape(r * 1.1));
+    var backingMesh = new THREE.Mesh(backingGeo, interiorBackingMat);
+    backingMesh.position.copy(pos).addScaledVector(dir.clone().normalize(), 0.02);
+    backingMesh.quaternion.setFromUnitVectors(fwd, inwardDir);
+    interiorGroup.add(backingMesh);
 
     if (pIdx !== -1) {
       var pdata = PROJECTS[pIdx];
