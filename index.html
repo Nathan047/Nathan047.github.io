@@ -87,14 +87,17 @@
   </header>
 
   <div class="hive-scene" id="hive-scene">
-    <canvas id="hive-canvas" tabindex="0" role="img" aria-label="Interactive 3D beehive. Press Enter or click the door to fly inside and browse projects on the honeycomb wall."></canvas>
-    <div class="hive-tooltip" id="hive-tooltip"></div>
+    <div class="hive-landing" id="hive-landing" role="button" tabindex="0" aria-label="Click to fly into the hive and browse projects on the honeycomb wall inside">
+      <img src="hive.png" alt="An illustrated beehive with bees flying around it">
+    </div>
+    <canvas id="hive-canvas" tabindex="-1" aria-hidden="true"></canvas>
     <button type="button" class="hive-back" id="hive-back" tabindex="-1">← Back to the hive</button>
     <p class="hive-hint" id="hive-hint">Drag to look around · click a cell to open a project</p>
+    <div class="hive-fade" id="hive-fade"></div>
     <div class="hive-live-region" id="hive-live" aria-live="polite"></div>
   </div>
   <p class="hive-caption">
-    Click or press Enter on the door to fly inside, then drag or use the arrow keys to look around the honeycomb wall — or jump straight to
+    Click the hive to fly inside, then drag or use the arrow keys to look around the honeycomb wall — or jump straight to
     <a href="/to-do-list/">To-Do List</a> · <a href="/fpl/">FPL Team Manager</a>.
   </p>
 
