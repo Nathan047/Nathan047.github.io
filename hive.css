@@ -105,6 +105,25 @@
 .hive-back:hover { border-color: var(--accent); color: var(--ink); }
 .hive-back:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+.hive-hint {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  z-index: 3;
+  margin: 0;
+  padding: 0.4rem 0.7rem;
+  background: rgba(16, 29, 46, 0.88);
+  border-radius: 6px;
+  color: var(--ink-soft);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.hive-hint.visible { opacity: 1; }
+
 #hive-css {
   position: absolute;
   inset: 0;

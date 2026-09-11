@@ -3,6 +3,7 @@
   var sceneEl = document.getElementById('hive-scene');
   var tooltip = document.getElementById('hive-tooltip');
   var backBtn = document.getElementById('hive-back');
+  var hintEl = document.getElementById('hive-hint');
   if (typeof THREE === 'undefined' || typeof THREE.CSS3DRenderer === 'undefined' || !canvas) return;
 
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -22,6 +23,9 @@
     badgeCream: 0xfff3d0,
     badgeHover: 0xffffff,
     archFill: 0x23374a,
+    doorWood: 0x8a5a30,
+    doorWoodSeam: 0x6b4423,
+    doorKnob: 0x23374a,
     groundShade: 'rgba(12,22,38,0.35)',
     groundShadeTransparent: 'rgba(12,22,38,0)',
     skyTop: '#16283f',
@@ -47,21 +51,11 @@
     seamTubularSegments: 64,
     seamRadialSegments: 10,
 
-    badgeCount: 6,
-    badgeHexR: 0.42,
-    badgeBackingPad: 0.08,
-    badgeEpsilonFill: 0.03,
-    badgeEpsilonBacking: 0.012,
-    badgeBandYNorm: 0.38,
-
     entranceYNorm: 0.07,
     entranceWidth: 0.95,
     entranceArchY: 0.68,
     entranceEpsilon: 0.02,
 
-    swayAmplitude: THREE.MathUtils.degToRad(12),
-    swaySpeed: 0.35,
-    swayResumeDelay: 2,
     bobAmplitude: 0.08,
     bobSpeed: 1.1,
 
@@ -317,11 +311,10 @@
   }
 
   var fwd = new THREE.Vector3(0, 0, 1);
-  var projectMeshes = [];
 
   // Every material that belongs to the exterior (the flat vector-icon hive
-  // body, its outline, seams, entrance and badges) is collected here as it
-  // is created, so setExteriorOpacity() below can never silently miss one.
+  // body, its outline, seams and door) is collected here as it is created,
+  // so setExteriorOpacity() below can never silently miss one.
   var exteriorMaterials = [];
 
   // Offset every vertex of a source geometry outward along its own vertex
@@ -426,13 +419,13 @@
     hive.add(torus);
   });
 
-  // ---------- entrance arch: a curved decal wrapped onto band 3, low on
-  // the front of the hive. Solid navy fill only -- a navy backing ring
-  // against navy fill would be invisible, and a navy hole read directly
-  // against the gold body already looks correct on its own ----------
+  // ---------- door: an arched opening low on the front of the hive, with
+  // an actual wooden door filling it (frame, panel, plank seam, knob) --
+  // built as four stacked curved decals, each a hair further from the body
+  // than the last so they layer front-to-back correctly ----------
 
-  function buildEntranceShape() {
-    var w = CONFIG.entranceWidth, archY = CONFIG.entranceArchY, r = w / 2;
+  function buildArchShape(scale) {
+    var w = CONFIG.entranceWidth * scale, archY = CONFIG.entranceArchY * scale, r = w / 2;
     var shape = new THREE.Shape();
     shape.moveTo(-w / 2, 0);
     shape.lineTo(-w / 2, archY);
@@ -442,94 +435,77 @@
     return shape;
   }
 
-  // polygonOffset pulls the decal's rasterized depth toward the camera --
+  // polygonOffset pulls each decal's rasterized depth toward the camera --
   // the wrapped epsilon offset alone (a few hundredths of a unit against a
   // body radius of ~3) isn't reliably enough separation for the depth
-  // buffer at typical camera distances, so without this the decal
-  // z-fights with (and usually loses to) the body surface underneath it.
-  var entranceMat = new THREE.MeshBasicMaterial({
-    color: PALETTE.archFill,
-    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2
-  });
-  exteriorMaterials.push(entranceMat);
+  // buffer at typical camera distances, so without this a decal z-fights
+  // with (and usually loses to) whatever sits behind it.
+  function doorDecalMat(color, offset) {
+    var mat = new THREE.MeshBasicMaterial({
+      color: color,
+      polygonOffset: true, polygonOffsetFactor: offset, polygonOffsetUnits: offset
+    });
+    exteriorMaterials.push(mat);
+    return mat;
+  }
+
   // Local azimuth 0 sits along +X; the camera looks down -Z at the hive, so
   // the camera-facing point on the surface is azimuth +PI/2 (see the same
-  // convention used for the badge slot offset below).
+  // convention used for the seam rings above).
   var entranceAzimuth = Math.PI / 2;
   var entranceBottomWorldY = yNormToWorldY(CONFIG.entranceYNorm);
-  var entranceGeo = new THREE.ShapeGeometry(buildEntranceShape());
-  wrapShapeToProfile(entranceGeo, entranceAzimuth, entranceBottomWorldY, CONFIG.entranceEpsilon);
-  var entranceMesh = new THREE.Mesh(entranceGeo, entranceMat);
+
+  function wrapDoorPart(shape, epsilon) {
+    var geo = new THREE.ShapeGeometry(shape);
+    wrapShapeToProfile(geo, entranceAzimuth, entranceBottomWorldY, epsilon);
+    return geo;
+  }
+
+  // Frame: the dark arched recess the door sits in.
+  var entranceMesh = new THREE.Mesh(
+    wrapDoorPart(buildArchShape(1), CONFIG.entranceEpsilon),
+    doorDecalMat(PALETTE.archFill, -2)
+  );
   hive.add(entranceMesh);
 
-  // ---------- hex badges: six evenly-spaced slots on the middle band
-  // (band 2). Two carry real projects (cream fill, clickable); four are
-  // decorative "locked" cells padding out the ring (body-gold fill, navy
-  // outline only, unclickable, excluded from the raycast target array) ----------
+  // Panel: the wood door itself, inset from the frame -- a thin sliver of
+  // the dark frame shows all the way round as its outline.
+  var doorPanelMesh = new THREE.Mesh(
+    wrapDoorPart(buildArchShape(0.82), CONFIG.entranceEpsilon + 0.01),
+    doorDecalMat(PALETTE.doorWood, -3)
+  );
+  hive.add(doorPanelMesh);
 
-  var badgeCenterWorldY = yNormToWorldY(CONFIG.badgeBandYNorm);
-  var badgeR = CONFIG.badgeHexR;
-  var badgeBackingR = badgeR + CONFIG.badgeBackingPad;
+  // Plank seam: a single vertical strip down the middle, reading as two
+  // boards rather than one flat slab.
+  var seamShape = new THREE.Shape();
+  var seamHalfW = CONFIG.entranceWidth * 0.015, seamH = CONFIG.entranceArchY * 0.82 * 0.94;
+  seamShape.moveTo(-seamHalfW, 0);
+  seamShape.lineTo(-seamHalfW, seamH);
+  seamShape.lineTo(seamHalfW, seamH);
+  seamShape.lineTo(seamHalfW, 0);
+  seamShape.closePath();
+  var doorSeamMesh = new THREE.Mesh(
+    wrapDoorPart(seamShape, CONFIG.entranceEpsilon + 0.02),
+    doorDecalMat(PALETTE.doorWoodSeam, -4)
+  );
+  hive.add(doorSeamMesh);
 
-  // Same polygonOffset reasoning as the entrance material above. Backing
-  // sits behind the fill, so it gets a smaller (but still nonzero) pull.
-  var badgeLockedMat = new THREE.MeshBasicMaterial({
-    color: PALETTE.bodyGold,
-    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2
-  });
-  var badgeBackingMat = new THREE.MeshBasicMaterial({
-    color: PALETTE.outline,
-    polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1
-  });
-  exteriorMaterials.push(badgeLockedMat, badgeBackingMat);
+  // Knob: a small circle offset to one side of the seam, roughly waist
+  // height on the door.
+  var knobShape = new THREE.Shape();
+  knobShape.absarc(CONFIG.entranceWidth * 0.14, CONFIG.entranceArchY * 0.82 * 0.42, CONFIG.entranceWidth * 0.035, 0, Math.PI * 2, false);
+  var doorKnobMesh = new THREE.Mesh(
+    wrapDoorPart(knobShape, CONFIG.entranceEpsilon + 0.03),
+    doorDecalMat(PALETTE.doorKnob, -5)
+  );
+  hive.add(doorKnobMesh);
 
-  var badgeSlots = [];
-  for (var b = 0; b < CONFIG.badgeCount; b++) {
-    badgeSlots.push((b / CONFIG.badgeCount) * Math.PI * 2 + Math.PI * 0.15);
-  }
-  // Which slots carry real projects. Slot azimuths are idx*60+27 degrees
-  // (0, 87, 147, 207, 267, 327); the camera faces 90 degrees. A hex badge
-  // wrapped onto a curved surface foreshortens fast as it turns away from
-  // the viewer -- even +-60 degrees off centre (tried [0, 2]) reads as a
-  // near-invisible sliver, so with only two real projects to place,
-  // discoverability on first load wins over spreading them around the
-  // ring: slot 1 sits almost dead-center (87, 3 degrees off) and slot 2
-  // (147, 57 degrees off) is close enough behind it to catch on a slight
-  // sway or a small drag, rather than requiring a real search.
-  var ACTIVE_SLOT_INDICES = [1, 2];
-
-  var badgeMeshes = [];
-
-  badgeSlots.forEach(function (az, idx) {
-    var backingGeo = new THREE.ShapeGeometry(hexShape(badgeBackingR));
-    wrapShapeToProfile(backingGeo, az, badgeCenterWorldY, CONFIG.badgeEpsilonBacking);
-    var backingMesh = new THREE.Mesh(backingGeo, badgeBackingMat);
-    hive.add(backingMesh);
-
-    var activeSlot = ACTIVE_SLOT_INDICES.indexOf(idx);
-    var fillGeo = new THREE.ShapeGeometry(hexShape(badgeR));
-    wrapShapeToProfile(fillGeo, az, badgeCenterWorldY, CONFIG.badgeEpsilonFill);
-
-    if (activeSlot !== -1 && PROJECTS[activeSlot]) {
-      var pdata = PROJECTS[activeSlot];
-      var fillMat = new THREE.MeshBasicMaterial({
-        color: PALETTE.badgeCream,
-        polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3
-      });
-      exteriorMaterials.push(fillMat);
-      var fillMesh = new THREE.Mesh(fillGeo, fillMat);
-      fillMesh.userData.project = pdata;
-      fillMesh.userData.isBadge = true;
-      hive.add(fillMesh);
-      projectMeshes.push(fillMesh);
-      badgeMeshes.push(fillMesh);
-    } else {
-      var lockedMesh = new THREE.Mesh(fillGeo, badgeLockedMat);
-      hive.add(lockedMesh);
-      badgeMeshes.push(lockedMesh);
-    }
-  });
-
+  // The exterior no longer carries any hex badges -- the door is the only
+  // way in from outside, and every project is browsed from the rotating
+  // interior instead. setBadgeVisualState is kept only because it's still
+  // called from hover/keyboard handlers below; it's a no-op now that no
+  // mesh ever has userData.isBadge set.
   function setBadgeVisualState(mesh, active) {
     if (!mesh || !mesh.userData.isBadge) return;
     mesh.material.color.set(active ? PALETTE.badgeHover : PALETTE.badgeCream);
@@ -833,7 +809,6 @@
   var mouse = new THREE.Vector2();
   var hovered = null;
   var paused = false;
-  var swayPhase = 0;
   var orbitYaw = 0;      // user-controlled base yaw, from drag-orbit / keyboard
   var orbitPolarDeg = 0; // user-controlled polar tilt, clamped orbitPolarMin..Max
   var dragYawVel = 0;
@@ -930,6 +905,7 @@
     mode = 'flying-out';
     backBtn.classList.remove('visible');
     backBtn.tabIndex = -1;
+    hintEl.classList.remove('visible');
     setInteractivity();
   }
 
@@ -938,10 +914,9 @@
     startFlightOut();
   });
 
-  // Entrance arch is an optional second fly-in affordance (null-project
-  // target) -- included in the raycast set but not in projectMeshes, so it
-  // isn't reachable via the Left/Right keyboard badge cycle.
-  var raycastTargets = projectMeshes.concat([entranceMesh]);
+  // The door is the only thing to click/hover/tab to from outside now --
+  // every project lives on the rotating interior instead.
+  var raycastTargets = [entranceMesh];
 
   function pointerAt(clientX, clientY) {
     if (mode !== 'orbit') return;
@@ -1084,50 +1059,19 @@
   sceneEl.addEventListener('mouseleave', function () { insideHovering = false; });
 
   // ---------- keyboard navigation ----------
-  // Left/Right cycles the active (real-project) badges, yaw-animating the
-  // hive so the selected one faces the camera. Enter/Space flies in,
-  // Escape flies back out while inside.
+  // Enter/Space flies in through the door (there's nothing else to select
+  // from outside any more -- projects are browsed on the rotating interior
+  // once inside). Escape flies back out.
   var liveRegion = document.getElementById('hive-live');
   function announce(text) {
     if (liveRegion) liveRegion.textContent = text;
   }
 
-  function badgeAzimuth(mesh) {
-    return Math.atan2(mesh.position.z, mesh.position.x);
-  }
-
-  // Rotating the hive group by rotation.y = theta shifts every point's
-  // effective azimuth by -theta (see Ry matrix), so to bring a badge at
-  // local azimuth phi to face the camera (+Z, azimuth pi/2) we need
-  // theta = phi - pi/2. Animated via the shortest angular path.
-  function animateYawTo(targetYaw) {
-    var current = orbitYaw;
-    var delta = ((targetYaw - current + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
-    yawTween = { from: current, to: current + delta, t: 0 };
-    lastInputTime = elapsed;
-  }
-
-  var keyboardIndex = -1;
-
   canvas.addEventListener('keydown', function (e) {
     if (mode === 'orbit') {
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        if (!projectMeshes.length) return;
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
         e.preventDefault();
-        if (keyboardIndex >= 0 && projectMeshes[keyboardIndex]) {
-          setBadgeVisualState(projectMeshes[keyboardIndex], false);
-        }
-        var dir = e.key === 'ArrowRight' ? 1 : -1;
-        keyboardIndex = ((keyboardIndex < 0 ? 0 : keyboardIndex + dir) + projectMeshes.length) % projectMeshes.length;
-        var mesh = projectMeshes[keyboardIndex];
-        setBadgeVisualState(mesh, true);
-        animateYawTo(badgeAzimuth(mesh) - Math.PI / 2);
-        announce(mesh.userData.project.name + ' — ' + mesh.userData.project.status + '. Press Enter to open.');
-      } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
-        if (keyboardIndex >= 0 && projectMeshes[keyboardIndex]) {
-          e.preventDefault();
-          startFlightIn(projectMeshes[keyboardIndex]);
-        }
+        startFlightIn(entranceMesh);
       }
     } else if (mode === 'inside') {
       if (e.key === 'Escape') {
@@ -1170,6 +1114,7 @@
           mode = 'inside';
           backBtn.classList.add('visible');
           backBtn.tabIndex = 0;
+          hintEl.classList.add('visible');
         } else {
           mode = 'orbit';
         }
@@ -1203,16 +1148,10 @@
         dragPolarVel *= damping;
       }
 
-      // Flat MeshBasicMaterial looks identical from every yaw angle on a
-      // rotationally-symmetric lathe under a full spin, so idle motion is a
-      // gentle yaw sway instead -- drag-orbit lets a visitor rotate past it
-      // to see the badges on other sides. Sway resumes a couple of seconds
-      // after the last drag/keyboard input, not immediately.
-      var idleFor = elapsed - lastInputTime;
-      var swayActive = !paused && !reduceMotion && !isDragging && !yawTween && idleFor > CONFIG.swayResumeDelay;
-      if (swayActive) swayPhase += dt * CONFIG.swaySpeed;
-      var swayOffset = swayActive ? Math.sin(swayPhase) * CONFIG.swayAmplitude : 0;
-      hive.rotation.y = orbitYaw + swayOffset;
+      // No idle yaw of its own out here -- rotation only happens inside the
+      // hive (the interior spin) or from the visitor's own drag/keyboard
+      // input (orbitYaw). The exterior just sits, bobbing gently.
+      hive.rotation.y = orbitYaw;
       hive.rotation.x = -0.18 + THREE.MathUtils.degToRad(orbitPolarDeg);
       if (!reduceMotion) {
         hive.position.y = Math.sin(elapsed * CONFIG.bobSpeed) * CONFIG.bobAmplitude;
