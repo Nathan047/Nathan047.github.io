@@ -1,18 +1,21 @@
-/* ---------- 3D hive ---------- */
+/* ---------- hive scene ---------- */
 
-/* Palette note: this file duplicates a handful of hex values from the
-   PALETTE const defined in hive.js (outline navy, sky gradient top) purely
-   for the no-JS fallback background below and the focus ring. There is no
-   build step tying the two together, so if PALETTE changes in hive.js this
-   fallback should be updated by hand -- an accepted small duplication cost
-   for staying framework/bundler-free. */
+/* Color note: #16283F below is a plain hardcoded fallback background (not
+   tied to any JS constant) so the diorama never reads as a black hole if
+   hive.png/hive-interior.png fail to load for any reason. */
+
+.hive-alt-hint {
+  margin: 0 0 0.5rem;
+  text-align: center;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+}
 
 .hive-scene {
   position: relative;
   height: 460px;
   margin-top: 0.5rem;
-  /* Hard fallback so the diorama never reads as a black hole if the
-     backdrop quad fails to render for any reason. Matches PALETTE.skyTop. */
   background: #16283F;
   border-radius: 8px;
   overflow: hidden;
@@ -39,64 +42,92 @@
   -webkit-user-drag: none;
 }
 
-/* Cells are plain buttons positioned in JS from the artwork's own
-   rendered box (see layoutCells in hive.js), so they track the image
-   exactly under object-fit: contain regardless of the scene's aspect
-   ratio. The hex clip-path is a flat-top hexagon, matching the actual
-   cells drawn in hive-interior.png (traced against the artwork's own
-   pixels -- see the PROJECTS comment in hive.js). */
-.hive-cell {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  padding: 0;
-  margin: 0;
-  cursor: pointer;
-  clip-path: polygon(25% 4%, 75% 4%, 98% 50%, 75% 96%, 25% 96%, 2% 50%);
-  transition: transform 0.15s ease;
-}
-
-.hive-cell::after {
-  content: '';
+/* Cells are an SVG overlay (see #hive-cells in index.html) sharing the
+   interior image's exact box and a viewBox matching hive-interior.png's own
+   pixel grid 1:1, so a cell polygon drawn at a given (cx, cy) always lands
+   on the same spot on the artwork regardless of the scene's rendered size
+   -- no JS resize listener needed. The SVG itself is pointer-events: none
+   so any letterboxing around the (object-fit: contain) image stays
+   click-through; pointer-events: fill is opted back in per-polygon so the
+   actual hex shape is the hit target, not its bounding box. */
+.hive-cells {
   position: absolute;
   inset: 0;
-  clip-path: polygon(25% 4%, 75% 4%, 98% 50%, 75% 96%, 25% 96%, 2% 50%);
-  border: 3px solid transparent;
-  background: transparent;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
-.hive-cell:hover,
+.hive-cell-poly {
+  fill: transparent;
+  stroke: transparent;
+  stroke-width: 4px;
+  pointer-events: fill;
+  cursor: pointer;
+  transition: fill 0.15s ease, stroke 0.15s ease;
+}
+
+.hive-cell:hover .hive-cell-poly,
+.hive-cell:focus-visible .hive-cell-poly {
+  fill: rgba(236, 48, 19, 0.16);
+  stroke: #ec3013;
+}
+
 .hive-cell:focus-visible {
-  transform: scale(1.05);
   outline: none;
 }
 
-.hive-cell:hover::after,
-.hive-cell:focus-visible::after {
-  border-color: #ec3013;
-  background-color: rgba(236, 48, 19, 0.16);
-}
-
-/* Always-visible index badge so the two clickable cells read as
-   interactive at a glance, not just on hover. Font size is set in JS
-   (layoutCells) proportional to the cell's own rendered size, since it
-   scales from ~24px wide on mobile up to ~90px on desktop. */
+/* Always-visible index badge so each clickable cell reads as interactive
+   at a glance, not just on hover. Being real SVG text inside the same
+   viewBox as the polygons, it scales with the artwork automatically. */
 .hive-cell-label {
-  position: relative;
-  z-index: 1;
   font-family: "Archivo", sans-serif;
   font-weight: 800;
-  color: #fff8ec;
-  text-shadow:
-    0 0 3px rgba(59, 24, 3, 0.85),
-    0 1px 2px rgba(59, 24, 3, 0.9),
-    0 0 8px rgba(59, 24, 3, 0.5);
+  font-size: 34px;
+  fill: #fff8ec;
+  text-anchor: middle;
+  dominant-baseline: central;
+  paint-order: stroke;
+  stroke: rgba(59, 24, 3, 0.85);
+  stroke-width: 5px;
+  stroke-linejoin: round;
   pointer-events: none;
   user-select: none;
+}
+
+/* ?cells=debug overlay: outlines every reserved slot (assigned to a
+   project or not) with its slot id, for measuring/verifying alignment
+   against the artwork without hand-tuning blind. */
+.hive-cell-debug-outline {
+  fill: rgba(236, 48, 19, 0.08);
+  stroke: #ec3013;
+  stroke-width: 2px;
+  pointer-events: none;
+}
+
+.hive-cell-debug-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 22px;
+  fill: #fff8ec;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  /* Below this width the hive scene is decorative only (see isMobile()
+     in hive.js, which also stops "enter hive" from doing anything) -- the
+     static #all-projects list is the primary interface. The pointer-events
+     rule is a defensive backstop so cells can never be clicked even if JS
+     state gets out of sync with viewport size. */
+  .hive-cell-poly { pointer-events: none; }
+  .hive-scene { height: 340px; }
+
+  /* #hive-landing is made non-interactive on mobile in hive.js
+     (syncLandingInteractivity) since enterHive() no-ops below this width;
+     drop the pointer cursor so it doesn't visually imply a dead click
+     target either. */
+  .hive-landing { cursor: default; }
 }
 
 .hive-live-region {
@@ -147,24 +178,104 @@
 
 .hive-fade.active { opacity: 1; }
 
-.hive-caption {
-  margin: 0.5rem 0 0;
-  text-align: center;
+/* ---------- static project list (first-class, zero-JS) ---------- */
+
+.all-projects {
+  margin-top: 2rem;
+}
+
+.all-projects h2 {
+  margin: 0 0 0.9rem;
+  font-family: "Fraunces", Georgia, serif;
+  font-optical-sizing: auto;
+  font-weight: 600;
+  font-size: 1.4rem;
+  color: var(--ink);
+}
+
+.project-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.project-list-link {
+  display: flex;
+  gap: 1rem;
+  align-items: baseline;
+  padding: 1rem 1.1rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.project-list-link:hover,
+.project-list-link:focus-visible {
+  border-color: var(--accent);
+  background: #1c3253;
+}
+
+.project-list-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.project-list-num {
+  flex: none;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   color: var(--ink-faint);
 }
 
-.hive-caption a {
-  color: var(--accent);
-  text-decoration: none;
+.project-list-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.65rem;
 }
 
-.hive-caption a:hover { text-decoration: underline; }
-.hive-caption a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.project-list-name {
+  font-family: "Archivo", sans-serif;
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--ink);
+}
 
-@media (max-width: 640px) {
-  .hive-scene { height: 340px; }
+.project-list-status {
+  flex: none;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.project-list-status--shipped {
+  color: var(--status-shipped);
+  background: var(--status-shipped-bg);
+}
+
+.project-list-status--progress {
+  color: var(--status-progress);
+  background: var(--status-progress-bg);
+}
+
+.project-list-status--archived {
+  color: var(--status-archived);
+  background: var(--status-archived-bg);
+}
+
+.project-list-desc {
+  flex-basis: 100%;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
 }
 
 .hive-back {

@@ -86,14 +86,15 @@
     <p class="tagline">Every project I've designed, collected in one place.</p>
   </header>
 
+  <p class="hive-alt-hint">The honeycomb below is just an alternate way to browse — everything on it is also listed under "All projects" further down the page.</p>
+
   <div class="hive-scene" id="hive-scene">
     <div class="hive-landing" id="hive-landing" role="button" tabindex="0" aria-label="Click to open the hive and browse projects on the honeycomb wall inside">
       <img src="hive.png" alt="An illustrated beehive with bees flying around it">
     </div>
     <div class="hive-interior" id="hive-interior" aria-hidden="true">
       <img id="hive-interior-img" src="hive-interior.png" alt="A honeycomb wall between two lantern posts, with bees flying around">
-      <button type="button" class="hive-cell" id="hive-cell-0" tabindex="-1"><span class="hive-cell-label" id="hive-cell-label-0"></span></button>
-      <button type="button" class="hive-cell" id="hive-cell-1" tabindex="-1"><span class="hive-cell-label" id="hive-cell-label-1"></span></button>
+      <svg id="hive-cells" class="hive-cells" viewBox="0 0 1672 941" preserveAspectRatio="xMidYMid meet"></svg>
     </div>
     <button type="button" class="hive-back" id="hive-back" tabindex="-1">← Back to the hive</button>
     <p class="hive-hint" id="hive-hint">Click a cell to open a project</p>
@@ -117,10 +118,32 @@
       </div>
     </div>
   </div>
-  <p class="hive-caption">
-    Click the hive to look inside, then click a cell on the honeycomb wall to open a project — or jump straight to
-    <a href="/to-do-list/">To-Do List</a> · <a href="/fpl/">FPL Team Manager</a>.
-  </p>
+
+  <section class="all-projects" id="all-projects" aria-labelledby="all-projects-heading">
+    <h2 id="all-projects-heading">All projects</h2>
+    <ul class="project-list">
+      <li class="project-list-item">
+        <a class="project-list-link" href="/to-do-list/">
+          <span class="project-list-num">01</span>
+          <span class="project-list-main">
+            <span class="project-list-name">To-Do List</span>
+            <span class="project-list-status project-list-status--shipped">Shipped</span>
+            <span class="project-list-desc">A checklist that saves itself — tasks fade away the moment you tick them off.</span>
+          </span>
+        </a>
+      </li>
+      <li class="project-list-item">
+        <a class="project-list-link" href="/fpl/">
+          <span class="project-list-num">02</span>
+          <span class="project-list-main">
+            <span class="project-list-name">FPL Team Manager</span>
+            <span class="project-list-status project-list-status--shipped">Shipped</span>
+            <span class="project-list-desc">A squad builder for my Fantasy Premier League team — real prices and points, with budget and quota rules enforced live.</span>
+          </span>
+        </a>
+      </li>
+    </ul>
+  </section>
 
   <footer>
     Maintained with Claude Code · last updated Sep 2026
