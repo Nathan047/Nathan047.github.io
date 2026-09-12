@@ -126,16 +126,18 @@
 .hive-back:hover { border-color: var(--accent); color: var(--ink); }
 .hive-back:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* Bottom-left instruction hint -- colors match the design handoff's own
+   spec exactly (light ink on near-black), not this site's usual tokens. */
 .hive-hint {
   position: absolute;
   bottom: 14px;
   left: 14px;
   z-index: 3;
   margin: 0;
-  padding: 0.4rem 0.7rem;
-  background: rgba(16, 29, 46, 0.88);
+  padding: 6px 10px;
+  background: rgba(30, 9, 0, 0.88);
   border-radius: 6px;
-  color: var(--ink-soft);
+  color: #f3f2f2;
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.72rem;
   opacity: 0;
@@ -145,63 +147,141 @@
 
 .hive-hint.visible { opacity: 1; }
 
-#hive-css {
+/* Bottom-right hover readout -- index + title, fades in on hover only.
+   Colors/type match the handoff's Modernist tokens: Archivo heading,
+   accent red for the index line. */
+.hive-readout {
   position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-  opacity: 0;
-  display: none;
-  transition: opacity 0.2s linear;
-}
-
-#hive-css.visible { opacity: 1; }
-
-.hive-card {
-  width: 220px;
-  padding: 0.85rem 1rem;
-  background: rgba(23, 41, 67, 0.94);
-  border: 1px solid var(--accent);
-  border-radius: 10px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
-  color: var(--ink);
-  font-family: "IBM Plex Sans", sans-serif;
+  bottom: 14px;
+  right: 14px;
+  z-index: 3;
+  min-width: 180px;
+  padding-left: 12px;
+  border-left: 2px solid #ec3013;
   text-align: left;
-  backface-visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s linear;
 }
 
-.hive-card-label {
-  display: block;
+.hive-readout.visible { opacity: 1; }
+
+.hive-readout-n {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 0.68rem;
-  color: var(--ink-faint);
-  margin-bottom: 0.2rem;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #ec3013;
 }
 
-.hive-card h3 {
-  margin: 0 0 0.5rem;
-  font-family: "Fraunces", Georgia, serif;
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: var(--ink);
+.hive-readout-t {
+  font-family: "Archivo", sans-serif;
+  font-weight: 800;
+  font-size: 20px;
+  line-height: 1.15;
+  color: #f3f2f2;
 }
 
-.hive-card-status {
-  display: inline-block;
-  padding: 0.12rem 0.5rem;
-  border-radius: 999px;
+/* Project modal -- Modernist design system tokens from the handoff doc,
+   used as literal values here rather than this site's own tokens, since
+   the brief is to match the reference file's look exactly. */
+.hive-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(32, 30, 29, 0.6);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease;
+}
+
+.hive-modal-backdrop.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.hive-modal {
+  width: min(420px, calc(100vw - 2.5rem));
+  max-height: calc(100vh - 3rem);
+  overflow-y: auto;
+  padding: 1.75rem;
+  background: #f3f2f2;
+  color: #201e1d;
+  border-radius: 0;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  transform: translateY(8px);
+  transition: transform 0.2s ease;
+}
+
+.hive-modal-backdrop.open .hive-modal { transform: translateY(0); }
+
+.hive-modal-kicker {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 0.68rem;
-  margin-bottom: 0.7rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #ec3013;
+  margin-bottom: 0.5rem;
 }
 
-.hive-card-link {
-  display: inline-block;
+.hive-modal-title {
+  margin: 0 0 0.85rem;
+  font-family: "Archivo", sans-serif;
+  font-weight: 800;
+  font-size: 1.6rem;
+  line-height: 1.15;
+  color: #201e1d;
+}
+
+.hive-modal-body {
+  margin: 0 0 1rem;
+  font-family: "Archivo", sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #201e1d;
+}
+
+.hive-modal-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.hive-modal-tags span {
+  padding: 0.2rem 0.6rem;
+  border: 1px solid #201e1d;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 0.78rem;
-  color: var(--accent);
+  font-size: 0.7rem;
+}
+
+.hive-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.hive-modal-btn {
+  padding: 0.6rem 1.1rem;
+  font-family: "Archivo", sans-serif;
+  font-weight: 800;
+  font-size: 0.85rem;
   text-decoration: none;
+  border: none;
+  cursor: pointer;
 }
 
-.hive-card-link:hover { text-decoration: underline; }
-.hive-card-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hive-modal-btn-primary {
+  background: #ec3013;
+  color: #f3f2f2;
+}
+
+.hive-modal-btn-ghost {
+  background: none;
+  color: #201e1d;
+  border: 1px solid #201e1d;
+}
+
+.hive-modal-btn:focus-visible { outline: 2px solid #ec3013; outline-offset: 2px; }
