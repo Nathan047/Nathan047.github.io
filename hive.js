@@ -20,6 +20,19 @@
   var modalEl = modalBackdrop ? modalBackdrop.querySelector('.hive-modal') : null;
   if (!landing || !interior) return;
 
+  // Arriving with a #hash (e.g. the sub-apps' "All projects" back link)
+  // relies on the browser's native scroll-to-fragment, which fires before
+  // hive.png (a large, unsized <img>) has finished loading and pushed the
+  // rest of the page down -- so it lands well short of the target and never
+  // re-corrects. Re-run the scroll once everything (images included) has
+  // actually settled.
+  if (window.location.hash) {
+    window.addEventListener('load', function () {
+      var target = document.getElementById(window.location.hash.slice(1));
+      if (target) target.scrollIntoView();
+    });
+  }
+
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var mobileQuery = window.matchMedia ? window.matchMedia('(max-width: 640px)') : null;
   function isMobile() { return mobileQuery ? mobileQuery.matches : window.innerWidth <= 640; }
