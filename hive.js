@@ -21,20 +21,24 @@
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Each cell's box as a fraction of hive-interior.png's own pixel grid
-  // (1672x941) -- read off two clean, fully-visible hexagons in the
-  // artwork's second row, spaced away from the lantern posts on either side.
+  // (1672x941). The hexagons are flat-top (flat top/bottom edges, pointy
+  // left/right vertices) -- these centers and the w/h box were found by
+  // sampling the artwork's actual border pixels and confirmed by drawing
+  // the resulting hexagon back over the image until it traced the real
+  // cell edges exactly (see .hive-cell's clip-path in hive.css for the
+  // matching flat-top polygon).
   var PROJECTS = [
     {
       name: 'To-Do List', status: 'Shipped', label: '01', href: '/to-do-list/',
       body: "A checklist that saves itself — tasks fade away the moment you tick them off.",
       tags: ['HTML', 'JavaScript'],
-      cell: { cx: 440 / 1672, cy: 490 / 941, w: 130 / 1672, h: 160 / 941 }
+      cell: { cx: 435 / 1672, cy: 435 / 941, w: 118 / 1672, h: 108 / 941 }
     },
     {
       name: 'FPL Team Manager', status: 'Shipped', label: '02', href: '/fpl/',
       body: "A squad builder for my Fantasy Premier League team — real prices and points, with budget and quota rules enforced live.",
       tags: ['HTML', 'JavaScript', 'Excel'],
-      cell: { cx: 920 / 1672, cy: 490 / 941, w: 130 / 1672, h: 160 / 941 }
+      cell: { cx: 1166 / 1672, cy: 434 / 941, w: 118 / 1672, h: 108 / 941 }
     }
   ];
 

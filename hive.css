@@ -51,7 +51,7 @@
   padding: 0;
   margin: 0;
   cursor: pointer;
-  clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+  clip-path: polygon(25% 4%, 75% 4%, 98% 50%, 75% 96%, 25% 96%, 2% 50%);
   transition: transform 0.15s ease;
 }
 
@@ -59,7 +59,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+  clip-path: polygon(25% 4%, 75% 4%, 98% 50%, 75% 96%, 25% 96%, 2% 50%);
   border: 3px solid transparent;
   background: transparent;
   transition: border-color 0.15s ease, background-color 0.15s ease;
