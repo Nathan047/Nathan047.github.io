@@ -175,7 +175,7 @@
 
     var wall = document.createElement('div');
     wall.className = 'hive-wall';
-    wall.style.backgroundImage = hexTileUrl(19, 'rgba(109,132,160,0.45)');
+    wall.style.backgroundImage = hexTileUrl(19, 'rgba(134,156,192,0.45)');
     wall.style.backgroundSize = (Math.sqrt(3) * 19) + 'px 57px';
     interior.appendChild(wall);
 

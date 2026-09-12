@@ -8,13 +8,16 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
   :root {
-    --paper: #101d2e;
-    --surface: #172943;
-    --ink: #e7edf5;
-    --ink-soft: #a7bad2;
-    --ink-faint: #6d84a0;
-    --line: #263c58;
-    --accent: #e0a94a;
+    --paper: #070A10;
+    --surface: #101B33;
+    --surface-2: #17284A;
+    --ink: #F1F5FB;
+    --ink-soft: #A9BEDE;
+    --ink-faint: #869CC0;
+    --line: #26406E;
+    --accent: #FFC93C;
+    --on-accent: #070A10;
+    --bad: #F2796B;
   }
 
   * { box-sizing: border-box; }
@@ -99,7 +102,7 @@
   #add-form button {
     padding: 0.65rem 1.1rem;
     background: var(--accent);
-    color: #1a1406;
+    color: var(--on-accent);
     border: none;
     border-radius: 6px;
     font-family: "IBM Plex Sans", sans-serif;
@@ -190,7 +193,7 @@
     top: 1px;
     width: 5px;
     height: 10px;
-    border: solid #1a1406;
+    border: solid var(--on-accent);
     border-width: 0 2px 2px 0;
     transform: rotate(45deg);
   }
@@ -220,7 +223,7 @@
     transition: color 0.15s ease;
   }
 
-  .task-delete:hover { color: #d9776a; }
+  .task-delete:hover { color: var(--bad); }
   .task-delete:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   .empty {
