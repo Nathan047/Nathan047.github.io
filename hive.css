@@ -115,7 +115,6 @@
     repeating-linear-gradient(115deg, rgba(59, 24, 3, 0.05) 0 2px, transparent 2px 7px);
 }
 
-.hive-hex:hover .hive-hex-rim,
 .hive-hex:focus-visible .hive-hex-rim {
   background: linear-gradient(155deg, #ff6a4a, #ec3013 60%);
 }
