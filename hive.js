@@ -78,12 +78,6 @@
     return 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
   }
 
-  var STATUS_DOT = {
-    'Shipped': 'var(--status-shipped)',
-    'In Progress': 'var(--status-progress)',
-    'Archived': 'var(--status-archived)'
-  };
-
   var PROJECTS = [
     {
       name: 'To-Do List', status: 'Shipped', label: '01', href: '/to-do-list/',
@@ -209,10 +203,6 @@
       var fill = document.createElement('div');
       fill.className = 'hive-hex-fill';
 
-      var dot = document.createElement('span');
-      dot.className = 'hive-hex-dot';
-      dot.style.background = STATUS_DOT[project.status] || 'var(--status-shipped)';
-
       var num = document.createElement('span');
       num.className = 'hive-hex-num';
       num.textContent = project.label;
@@ -221,7 +211,6 @@
       name.className = 'hive-hex-name';
       name.textContent = project.name;
 
-      fill.appendChild(dot);
       fill.appendChild(num);
       fill.appendChild(name);
       btn.appendChild(rim);

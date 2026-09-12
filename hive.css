@@ -159,16 +159,6 @@
   padding: 0 8%;
 }
 
-.hive-hex-dot {
-  position: absolute;
-  top: 14%;
-  right: 24%;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  box-shadow: 0 0 0 2px rgba(59, 24, 3, 0.25);
-}
-
 @media (max-width: 640px) {
   /* Below this width the hive scene is decorative only (see isMobile()
      in hive.js, which also stops "enter hive" from doing anything) -- the
