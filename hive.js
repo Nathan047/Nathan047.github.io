@@ -48,6 +48,8 @@
 
   var cellEls = PROJECTS.map(function (project, i) {
     var el = document.getElementById('hive-cell-' + i);
+    var label = document.getElementById('hive-cell-label-' + i);
+    label.textContent = project.label;
     el.setAttribute('aria-label', 'Open ' + project.name + ' project details');
     el.addEventListener('mouseenter', function () { setHover(project, true); });
     el.addEventListener('mouseleave', function () { setHover(project, false); });
@@ -84,6 +86,7 @@
       el.style.top = (imgRect.top - hostRect.top + c.cy * imgRect.height - h / 2) + 'px';
       el.style.width = w + 'px';
       el.style.height = h + 'px';
+      document.getElementById('hive-cell-label-' + i).style.fontSize = Math.max(9, w * 0.34) + 'px';
     });
   }
   window.addEventListener('resize', layoutCells);
