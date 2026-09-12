@@ -1,12 +1,8 @@
 (function () {
-  var SVG_NS = 'http://www.w3.org/2000/svg';
-
   var landing = document.getElementById('hive-landing');
   var interior = document.getElementById('hive-interior');
-  var interiorImg = document.getElementById('hive-interior-img');
   var hiveScene = document.getElementById('hive-scene');
   var hiveAltHint = document.querySelector('.hive-alt-hint');
-  var cellsSvg = document.getElementById('hive-cells');
   var backBtn = document.getElementById('hive-back');
   var hintEl = document.getElementById('hive-hint');
   var fadeEl = document.getElementById('hive-fade');
@@ -22,90 +18,82 @@
   var modalLink = document.getElementById('hive-modal-link');
   var modalClose = document.getElementById('hive-modal-close');
   var modalEl = modalBackdrop ? modalBackdrop.querySelector('.hive-modal') : null;
-  if (!landing || !interior || !interiorImg) return;
+  if (!landing || !interior) return;
 
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var mobileQuery = window.matchMedia ? window.matchMedia('(max-width: 640px)') : null;
   function isMobile() { return mobileQuery ? mobileQuery.matches : window.innerWidth <= 640; }
 
-  var debugMode = /(?:^|[?&])cells=debug(?:&|$)/.test(window.location.search);
+  // ---------- hex layout (ported verbatim from the reviewed
+  // hive-comb-preview.html mockup) ----------
+  //
+  // Flat-top hexagon comb: alternating half-pitch row offset, with a
+  // partial last row picking a centered subset of columns from the SAME
+  // alternating grid as a full row of that parity (rather than being
+  // independently centered), so it nests into the notches of the row above
+  // instead of sitting on its own phase.
 
-  // ---------- hex geometry ----------
-
-  // Circumradius (center-to-vertex) of one honeycomb cell, in
-  // hive-interior.png's own pixel grid (source image is 1672x941). Derived
-  // by sampling the artwork's seam pixels between adjacent cells: the two
-  // known real cell centers below sit exactly 6 columns apart (731px),
-  // and a flat-top hex grid's column pitch is 1.5 * r, so
-  // 731 / (6 * 1.5) = r = ~81.2.
-  var HEX = { r: 81.2 };
-
-  // Returns an SVG polygon "points" string for a flat-top hexagon (flat
-  // top/bottom edges, pointy left/right vertices) centered at (cx, cy).
-  // Confirmed flat-top by sampling hive-interior.png directly: each cell's
-  // top/bottom edges are flat horizontal seams, and left/right vertices are
-  // single points shared with the diagonally-adjacent cells -- matching
-  // the existing flat-top clip-path this file used to rely on.
-  function hexPoints(cx, cy, r) {
-    r = r || HEX.r;
-    var h = r * Math.sqrt(3);
-    return [
-      [cx + r, cy],
-      [cx + r / 2, cy - h / 2],
-      [cx - r / 2, cy - h / 2],
-      [cx - r, cy],
-      [cx - r / 2, cy + h / 2],
-      [cx + r / 2, cy + h / 2]
-    ].map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
+  function layout(n, r) {
+    var cols = Math.min(5, Math.max(2, Math.ceil(Math.sqrt(n * 1.4))));
+    var rows = Math.ceil(n / cols);
+    var hw = Math.sqrt(3) * r, hh = 2 * r, vPitch = 1.5 * r;
+    var W = cols * hw + hw / 2, H = (rows - 1) * vPitch + hh;
+    var cells = [], idx = 0;
+    for (var row = 0; row < rows; row++) {
+      var itemsInRow = Math.min(cols, n - idx);
+      var isOdd = row % 2 === 1;
+      // A partial row still picks columns off the SAME alternating grid as a
+      // full row of this parity (just a centered subset of them), so it nests
+      // into the notches of the row above instead of sitting on its own phase.
+      var startCol = Math.floor((cols - itemsInRow) / 2);
+      for (var c = 0; c < itemsInRow; c++) {
+        var col = startCol + c;
+        var cx = (isOdd ? hw / 2 : 0) + col * hw + hw / 2;
+        var cy = row * vPitch + hh / 2;
+        cells.push({ cx: cx, cy: cy });
+        idx++;
+      }
+    }
+    return { cols: cols, rows: rows, hw: hw, hh: hh, W: W, H: H, cells: cells };
   }
 
-  // Hex-cell centres in hive-interior.png's own pixel grid (source image is
-  // 1672x941). CELL_SLOTS intentionally reserves more slots than there are
-  // projects today, so future projects can be wired in by slot id alone
-  // without re-measuring the artwork.
-  //
-  // slot-1 and slot-2 are real, precisely-measured centres (previously the
-  // only two hardcoded .hive-cell buttons; these pixel values are the same
-  // ones that used to live in PROJECTS[].cell as cx/cy fractions of
-  // 1672x941, just converted back to plain pixels).
-  //
-  // slot-3..slot-12 were initially computed from the known flat-top hex
-  // grid pitch (column step 1.5r ~= 121.8px, row step r*sqrt(3) ~= 140.7px,
-  // odd columns offset half a row down), calibrated off slot-1/slot-2,
-  // then verified against the actual artwork by sampling pixel colour at
-  // each centre (and a small ring around it) to confirm it lands on honey-
-  // coloured fill, not the sky background or a seam (Sep 2026). One slot
-  // (originally slot-12 at 1409,294) failed this check -- it sat in the sky
-  // above the comb's ragged top-right edge -- and was moved to a confirmed
-  // clean hexagon instead. Re-run this check via ?cells=debug (plus a pixel
-  // sample) if hive-interior.png ever changes.
-  var CELL_SLOTS = [
-    { id: 'slot-1', cx: 435, cy: 435 },   // real, measured
-    { id: 'slot-2', cx: 1166, cy: 434 },  // real, measured
-    { id: 'slot-3', cx: 313, cy: 505 },   // verified
-    { id: 'slot-4', cx: 557, cy: 505 },   // verified
-    { id: 'slot-5', cx: 679, cy: 435 },   // verified
-    { id: 'slot-6', cx: 800, cy: 505 },   // verified
-    { id: 'slot-7', cx: 922, cy: 435 },   // verified
-    { id: 'slot-8', cx: 1044, cy: 505 },  // verified
-    { id: 'slot-9', cx: 1288, cy: 505 },  // verified
-    { id: 'slot-10', cx: 1409, cy: 435 }, // verified
-    { id: 'slot-11', cx: 313, cy: 646 },  // verified
-    { id: 'slot-12', cx: 922, cy: 294 }   // verified (relocated from the sky-sitting original estimate)
-  ];
+  // Tiled hex-outline background used behind the comb, so a small number of
+  // projects still reads as a wall of honeycomb rather than floating in
+  // empty space. Also ported from the mockup.
+  function hexTileUrl(r, color) {
+    var hw = Math.sqrt(3) * r, w = hw, h = 3 * r;
+    function pts(cx, cy) {
+      var p = [];
+      for (var i = 0; i < 6; i++) {
+        var a = (-90 + i * 60) * Math.PI / 180;
+        p.push((cx + r * Math.cos(a)).toFixed(1) + ',' + (cy + r * Math.sin(a)).toFixed(1));
+      }
+      return p.join(' ');
+    }
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
+      '<polygon points="' + pts(w / 2, r) + '" fill="none" stroke="' + color + '" stroke-width="1"/>' +
+      '<polygon points="' + pts(0, 2.5 * r) + '" fill="none" stroke="' + color + '" stroke-width="1"/>' +
+      '<polygon points="' + pts(w, 2.5 * r) + '" fill="none" stroke="' + color + '" stroke-width="1"/>' +
+      '</svg>';
+    return 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
+  }
+
+  var STATUS_DOT = {
+    'Shipped': 'var(--status-shipped)',
+    'In Progress': 'var(--status-progress)',
+    'Archived': 'var(--status-archived)'
+  };
 
   var PROJECTS = [
     {
       name: 'To-Do List', status: 'Shipped', label: '01', href: '/to-do-list/',
       body: "A checklist that saves itself — tasks fade away the moment you tick them off.",
-      tags: ['HTML', 'JavaScript'],
-      slot: 'slot-1'
+      tags: ['HTML', 'JavaScript']
     },
     {
       name: 'FPL Team Manager', status: 'Shipped', label: '02', href: '/fpl/',
       body: "A squad builder for my Fantasy Premier League team — real prices and points, with budget and quota rules enforced live.",
-      tags: ['HTML', 'JavaScript', 'Excel'],
-      slot: 'slot-2'
+      tags: ['HTML', 'JavaScript', 'Excel']
     }
   ];
 
@@ -113,45 +101,40 @@
     if (liveRegion) liveRegion.textContent = text;
   }
 
-  // ---------- data validation (overflow tripwire / drift check) ----------
+  // ---------- data validation (drift check) ----------
+  //
+  // There's no fixed artwork/slot ceiling any more -- the comb always has
+  // exactly as many hexagons as PROJECTS has entries. The one remaining
+  // real drift risk between the two hand-maintained lists is the static
+  // #all-projects markup in index.html falling out of sync with PROJECTS.
 
   function validateHiveData() {
     var ok = true;
-    var slotIds = CELL_SLOTS.map(function (s) { return s.id; });
 
-    if (PROJECTS.length > CELL_SLOTS.length) {
-      console.warn('[hive] PROJECTS.length (' + PROJECTS.length + ') exceeds CELL_SLOTS.length (' + CELL_SLOTS.length + '); add more slots before adding more projects.');
+    if (!PROJECTS.length) {
+      console.warn('[hive] PROJECTS is empty; nothing to render on the comb.');
       ok = false;
     }
 
+    var seenHrefs = {};
+    var seenLabels = {};
     PROJECTS.forEach(function (project) {
-      if (slotIds.indexOf(project.slot) === -1) {
-        console.warn('[hive] Project "' + project.name + '" references missing slot id "' + project.slot + '".');
+      if (!project.name || !project.label || !project.href || !project.body || !project.tags) {
+        console.warn('[hive] Project is missing a required field (name/label/href/body/tags): ' + JSON.stringify(project));
+        ok = false;
+        return;
+      }
+      if (seenHrefs[project.href]) {
+        console.warn('[hive] Duplicate project href "' + project.href + '" ("' + seenHrefs[project.href] + '" and "' + project.name + '").');
         ok = false;
       }
-    });
+      seenHrefs[project.href] = project.name;
 
-    // CELL_SLOTS itself must not define the same slot id twice -- that would
-    // silently make two hexagons on the wall resolve to the same geometry
-    // (or worse, make slotsById drop one of them) with no other signal.
-    var seenSlotIds = {};
-    CELL_SLOTS.forEach(function (slot) {
-      if (seenSlotIds[slot.id]) {
-        console.warn('[hive] CELL_SLOTS contains a duplicate slot id "' + slot.id + '".');
+      if (seenLabels[project.label]) {
+        console.warn('[hive] Duplicate project label "' + project.label + '" ("' + seenLabels[project.label] + '" and "' + project.name + '").');
         ok = false;
       }
-      seenSlotIds[slot.id] = true;
-    });
-
-    // Two projects can't share one slot -- one of them would silently fail
-    // to render a cell (slotsById[slot.id] only ever points at one hexagon).
-    var usedSlots = {};
-    PROJECTS.forEach(function (project) {
-      if (usedSlots[project.slot]) {
-        console.warn('[hive] Slot id "' + project.slot + '" is used by more than one project ("' + usedSlots[project.slot] + '" and "' + project.name + '"); each project must reference a unique slot.');
-        ok = false;
-      }
-      usedSlots[project.slot] = project.name;
+      seenLabels[project.label] = project.name;
     });
 
     var listHrefs = Array.prototype.map.call(
@@ -168,85 +151,152 @@
     return ok;
   }
 
-  var slotsById = {};
-  CELL_SLOTS.forEach(function (slot) { slotsById[slot.id] = slot; });
-
   var dataOk = validateHiveData();
 
-  if (!dataOk && !debugMode) {
+  if (!dataOk) {
     // Skip rendering the hive scene entirely and rely on the static list.
     if (hiveScene) hiveScene.style.display = 'none';
     if (hiveAltHint) hiveAltHint.style.display = 'none';
     return;
   }
 
-  // ---------- SVG cell rendering ----------
+  // ---------- mode / fade transition ----------
+
+  var mode = 'landing'; // landing | inside
+  var FADE_MS = reduceMotion ? 0 : 280;
+
+  // ---------- comb rendering ----------
 
   var cellEls = [];
+  var combStage = null;
+  var combEl = null;
 
-  function renderHiveCells() {
-    if (!cellsSvg) return;
-    cellsSvg.innerHTML = '';
+  // Phase (a): build the comb structure and one button per project. This
+  // only needs to run once (or if PROJECTS itself ever changed, which it
+  // doesn't dynamically today) -- element identity must survive resizes so
+  // that focus and openModal()'s saved modalTriggerEl reference stay valid.
+  function buildHiveComb() {
+    interior.innerHTML = '';
     cellEls = [];
 
-    if (debugMode) {
-      CELL_SLOTS.forEach(function (slot) {
-        var g = document.createElementNS(SVG_NS, 'g');
-        var poly = document.createElementNS(SVG_NS, 'polygon');
-        poly.setAttribute('points', hexPoints(slot.cx, slot.cy));
-        poly.setAttribute('class', 'hive-cell-debug-outline');
-        g.appendChild(poly);
-        var text = document.createElementNS(SVG_NS, 'text');
-        text.setAttribute('x', slot.cx);
-        text.setAttribute('y', slot.cy);
-        text.setAttribute('class', 'hive-cell-debug-label');
-        text.textContent = slot.id;
-        g.appendChild(text);
-        cellsSvg.appendChild(g);
-      });
-      return;
-    }
+    var wall = document.createElement('div');
+    wall.className = 'hive-wall';
+    wall.style.backgroundImage = hexTileUrl(19, 'rgba(232,158,74,0.5)');
+    wall.style.backgroundSize = (Math.sqrt(3) * 19) + 'px 57px';
+    interior.appendChild(wall);
+
+    var stage = document.createElement('div');
+    stage.className = 'hive-comb-stage';
+    interior.appendChild(stage);
+
+    var comb = document.createElement('div');
+    comb.className = 'hive-comb';
+    stage.appendChild(comb);
+
+    combStage = stage;
+    combEl = comb;
 
     PROJECTS.forEach(function (project) {
-      var slot = slotsById[project.slot];
-      if (!slot) return; // already warned in validateHiveData
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'hive-hex';
+      btn.tabIndex = -1; // synced to 0 by crossfadeTo()/syncMobileGating() when appropriate
+      btn.setAttribute('aria-label', 'Open ' + project.name + ' project details');
 
-      var g = document.createElementNS(SVG_NS, 'g');
-      g.setAttribute('class', 'hive-cell');
-      g.setAttribute('role', 'button');
-      g.setAttribute('tabindex', '-1');
-      g.setAttribute('aria-label', 'Open ' + project.name + ' project details');
+      var rim = document.createElement('div');
+      rim.className = 'hive-hex-rim';
 
-      var poly = document.createElementNS(SVG_NS, 'polygon');
-      poly.setAttribute('points', hexPoints(slot.cx, slot.cy));
-      poly.setAttribute('class', 'hive-cell-poly');
-      g.appendChild(poly);
+      var fill = document.createElement('div');
+      fill.className = 'hive-hex-fill';
 
-      var text = document.createElementNS(SVG_NS, 'text');
-      text.setAttribute('x', slot.cx);
-      text.setAttribute('y', slot.cy);
-      text.setAttribute('class', 'hive-cell-label');
-      text.textContent = project.label;
-      g.appendChild(text);
+      var dot = document.createElement('span');
+      dot.className = 'hive-hex-dot';
+      dot.style.background = STATUS_DOT[project.status] || 'var(--status-shipped)';
 
-      g.addEventListener('mouseenter', function () { setHover(project, true); });
-      g.addEventListener('mouseleave', function () { setHover(project, false); });
-      g.addEventListener('focus', function () { setHover(project, true); });
-      g.addEventListener('blur', function () { setHover(project, false); });
-      g.addEventListener('click', function () { openModal(project); });
-      g.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
-          e.preventDefault();
-          openModal(project);
-        }
-      });
+      var num = document.createElement('span');
+      num.className = 'hive-hex-num';
+      num.textContent = project.label;
 
-      cellsSvg.appendChild(g);
-      cellEls.push(g);
+      var name = document.createElement('span');
+      name.className = 'hive-hex-name';
+      name.textContent = project.name;
+
+      fill.appendChild(dot);
+      fill.appendChild(num);
+      fill.appendChild(name);
+      btn.appendChild(rim);
+      btn.appendChild(fill);
+
+      btn.addEventListener('mouseenter', function () { setHover(project, true); });
+      btn.addEventListener('mouseleave', function () { setHover(project, false); });
+      btn.addEventListener('focus', function () { setHover(project, true); });
+      btn.addEventListener('blur', function () { setHover(project, false); });
+      btn.addEventListener('click', function () { openModal(project); });
+
+      // Stash the label spans on the button itself so positionHiveComb()
+      // can restyle them in place without re-querying the DOM.
+      btn._numEl = num;
+      btn._nameEl = name;
+
+      comb.appendChild(btn);
+      cellEls.push(btn);
     });
   }
 
-  renderHiveCells();
+  // Phase (b): compute layout(n, r) geometry against the current stage size
+  // and apply left/top/width/height/font-sizes to the EXISTING buttons. Safe
+  // to call repeatedly (e.g. on every resize) since it never touches DOM
+  // structure or element identity.
+  function positionHiveComb() {
+    if (!combStage || !combEl) return;
+
+    var stageW = combStage.clientWidth - 40;
+    var stageH = combStage.clientHeight - 92;
+    var r = 62;
+    var geo = layout(PROJECTS.length, r);
+    var scale = Math.min(1, stageW / geo.W, stageH / geo.H, (geo.cols <= 2 ? 1 : 190 * geo.cols / geo.W));
+
+    combEl.style.width = (geo.W * scale) + 'px';
+    combEl.style.height = (geo.H * scale) + 'px';
+
+    PROJECTS.forEach(function (project, i) {
+      var cell = geo.cells[i];
+      var btn = cellEls[i];
+      if (!btn) return;
+
+      btn.style.left = ((cell.cx - geo.hw / 2) * scale) + 'px';
+      btn.style.top = ((cell.cy - geo.hh / 2) * scale) + 'px';
+      btn.style.width = (geo.hw * scale) + 'px';
+      btn.style.height = (geo.hh * scale) + 'px';
+
+      if (btn._numEl) btn._numEl.style.fontSize = Math.max(13, geo.hh * scale * 0.22) + 'px';
+      if (btn._nameEl) btn._nameEl.style.fontSize = Math.max(9, geo.hh * scale * 0.1) + 'px';
+    });
+  }
+
+  buildHiveComb();
+  positionHiveComb();
+
+  // The comb's cell positions/sizes are computed in JS pixels (not a scaling
+  // SVG viewBox), so a viewport width change that doesn't cross the mobile
+  // breakpoint (e.g. resizing a desktop window) still needs a re-layout to
+  // keep the comb correctly scaled to the available stage area. Only the
+  // positioning phase runs here -- rebuilding the buttons on every resize
+  // would destroy element identity, dropping focus off a focused hex and
+  // breaking openModal()'s saved modalTriggerEl reference if a modal is
+  // open. Rapid resize events (e.g. a drag-resize) are coalesced to at most
+  // one reposition per animation frame via rAF de-duping.
+  var resizeRaf = null;
+  window.addEventListener('resize', function () {
+    if (resizeRaf !== null) cancelAnimationFrame(resizeRaf);
+    resizeRaf = requestAnimationFrame(function () {
+      resizeRaf = null;
+      positionHiveComb();
+      if (mode === 'inside') {
+        cellEls.forEach(function (el) { el.tabIndex = isMobile() ? -1 : 0; });
+      }
+    });
+  });
 
   function setHover(project, on) {
     if (on) {
@@ -257,11 +307,6 @@
       readoutEl.classList.remove('visible');
     }
   }
-
-  // ---------- mode / fade transition ----------
-
-  var mode = 'landing'; // landing | inside
-  var FADE_MS = reduceMotion ? 0 : 280;
 
   function crossfadeTo(showInside) {
     fadeEl.classList.add('active');
@@ -463,10 +508,4 @@
     if (modalOpen) { e.preventDefault(); closeModal(); }
     else if (mode === 'inside') { e.preventDefault(); exitHive(); }
   });
-
-  // In debug mode, jump straight into the interior so the slot grid is
-  // visible without needing to click the hive first.
-  if (debugMode && mode === 'landing' && !isMobile()) {
-    crossfadeTo(true);
-  }
 })();

@@ -1,8 +1,20 @@
 /* ---------- hive scene ---------- */
 
+:root {
+  /* Tokens scoped to the honeycomb interior only -- everything else in this
+     file uses the site-wide tokens declared in index.html's own :root. */
+  --hive-stage: #200f06;
+  --hive-stage-2: #1a0c05;
+  --hive-rim: #7a4110;
+  --hive-rim-hi: #a85f1a;
+  --hive-fill-hi: #ffce6e;
+  --hive-fill-lo: #d68a1f;
+  --hive-ink: #3b1803;
+}
+
 /* Color note: #16283F below is a plain hardcoded fallback background (not
    tied to any JS constant) so the diorama never reads as a black hole if
-   hive.png/hive-interior.png fail to load for any reason. */
+   hive.png fails to load for any reason. */
 
 .hive-alt-hint {
   margin: 0 0 0.5rem;
@@ -27,91 +39,117 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s linear;
+  background:
+    radial-gradient(ellipse at 50% 38%, rgba(255, 206, 110, 0.16), transparent 60%),
+    var(--hive-stage);
 }
 
 .hive-interior.visible { opacity: 1; pointer-events: auto; }
 
-.hive-interior img {
+/* Tiled hex-outline wall behind the comb, so even a couple of projects
+   still reads as a honeycomb wall rather than floating in empty space. */
+.hive-wall {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-  user-select: none;
-  -webkit-user-drag: none;
+  background-repeat: repeat;
+  opacity: 0.5;
 }
 
-/* Cells are an SVG overlay (see #hive-cells in index.html) sharing the
-   interior image's exact box and a viewBox matching hive-interior.png's own
-   pixel grid 1:1, so a cell polygon drawn at a given (cx, cy) always lands
-   on the same spot on the artwork regardless of the scene's rendered size
-   -- no JS resize listener needed. The SVG itself is pointer-events: none
-   so any letterboxing around the (object-fit: contain) image stays
-   click-through; pointer-events: fill is opted back in per-polygon so the
-   actual hex shape is the hit target, not its bounding box. */
-.hive-cells {
+/* The comb is generated in JS (see buildHiveComb()/positionHiveComb() in
+   hive.js): one .hive-hex button per project, positioned/sized in pixels
+   from the ported honeycomb layout() algorithm, centered on the stage via
+   this flex wrapper. There's no fixed slot ceiling -- the comb always has
+   exactly as many hexagons as PROJECTS has entries. */
+.hive-comb-stage {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 46px 20px;
 }
 
-.hive-cell-poly {
-  fill: transparent;
-  stroke: transparent;
-  stroke-width: 4px;
-  pointer-events: fill;
+.hive-comb {
+  position: relative;
+}
+
+.hive-hex {
+  position: absolute;
+  padding: 0;
+  border: none;
+  background: none;
   cursor: pointer;
-  transition: fill 0.15s ease, stroke 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.hive-cell:hover .hive-cell-poly,
-.hive-cell:focus-visible .hive-cell-poly {
-  fill: rgba(236, 48, 19, 0.16);
-  stroke: #ec3013;
+.hive-hex:focus-visible {
+  outline: 2px solid #ec3013;
+  outline-offset: 3px;
+  border-radius: 4px;
 }
 
-.hive-cell:focus-visible {
-  outline: none;
+.hive-hex-rim,
+.hive-hex-fill {
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
 }
 
-/* Always-visible index badge so each clickable cell reads as interactive
-   at a glance, not just on hover. Being real SVG text inside the same
-   viewBox as the polygons, it scales with the artwork automatically. */
-.hive-cell-label {
+.hive-hex-rim {
+  background: linear-gradient(155deg, var(--hive-rim-hi), var(--hive-rim) 60%);
+  transition: background 0.15s ease;
+}
+
+.hive-hex-fill {
+  inset: 4.5%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  box-shadow: inset 0 -6px 10px rgba(59, 24, 3, 0.35);
+  transition: transform 0.15s ease;
+  background-image:
+    radial-gradient(120% 100% at 28% 18%, rgba(255, 255, 255, 0.55), transparent 42%),
+    linear-gradient(160deg, var(--hive-fill-hi), var(--hive-fill-lo) 78%),
+    repeating-linear-gradient(115deg, rgba(59, 24, 3, 0.05) 0 2px, transparent 2px 7px);
+}
+
+.hive-hex:hover .hive-hex-rim,
+.hive-hex:focus-visible .hive-hex-rim {
+  background: linear-gradient(155deg, #ff6a4a, #ec3013 60%);
+}
+
+.hive-hex:hover .hive-hex-fill,
+.hive-hex:focus-visible .hive-hex-fill {
+  transform: translateY(-3px);
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.4));
+}
+
+.hive-hex-num {
   font-family: "Archivo", sans-serif;
   font-weight: 800;
-  font-size: 34px;
-  fill: #fff8ec;
-  text-anchor: middle;
-  dominant-baseline: central;
-  paint-order: stroke;
-  stroke: rgba(59, 24, 3, 0.85);
-  stroke-width: 5px;
-  stroke-linejoin: round;
-  pointer-events: none;
-  user-select: none;
+  color: var(--hive-ink);
+  line-height: 1;
 }
 
-/* ?cells=debug overlay: outlines every reserved slot (assigned to a
-   project or not) with its slot id, for measuring/verifying alignment
-   against the artwork without hand-tuning blind. */
-.hive-cell-debug-outline {
-  fill: rgba(236, 48, 19, 0.08);
-  stroke: #ec3013;
-  stroke-width: 2px;
-  pointer-events: none;
+.hive-hex-name {
+  font-family: "IBM Plex Sans", sans-serif;
+  font-weight: 600;
+  color: var(--hive-ink);
+  text-align: center;
+  line-height: 1.15;
+  padding: 0 8%;
 }
 
-.hive-cell-debug-label {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 22px;
-  fill: #fff8ec;
-  text-anchor: middle;
-  dominant-baseline: central;
-  pointer-events: none;
+.hive-hex-dot {
+  position: absolute;
+  top: 14%;
+  right: 24%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(59, 24, 3, 0.25);
 }
 
 @media (max-width: 640px) {
@@ -120,7 +158,7 @@
      static #all-projects list is the primary interface. The pointer-events
      rule is a defensive backstop so cells can never be clicked even if JS
      state gets out of sync with viewport size. */
-  .hive-cell-poly { pointer-events: none; }
+  .hive-hex { pointer-events: none; }
   .hive-scene { height: 340px; }
 
   /* #hive-landing is made non-interactive on mobile in hive.js
