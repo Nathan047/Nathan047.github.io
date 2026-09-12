@@ -87,12 +87,16 @@
   </header>
 
   <div class="hive-scene" id="hive-scene">
-    <div class="hive-landing" id="hive-landing" role="button" tabindex="0" aria-label="Click to fly into the hive and browse projects on the honeycomb wall inside">
+    <div class="hive-landing" id="hive-landing" role="button" tabindex="0" aria-label="Click to open the hive and browse projects on the honeycomb wall inside">
       <img src="hive.png" alt="An illustrated beehive with bees flying around it">
     </div>
-    <canvas id="hive-canvas" tabindex="-1" aria-hidden="true"></canvas>
+    <div class="hive-interior" id="hive-interior" aria-hidden="true">
+      <img id="hive-interior-img" src="hive-interior.png" alt="A honeycomb wall between two lantern posts, with bees flying around">
+      <button type="button" class="hive-cell" id="hive-cell-0" tabindex="-1"></button>
+      <button type="button" class="hive-cell" id="hive-cell-1" tabindex="-1"></button>
+    </div>
     <button type="button" class="hive-back" id="hive-back" tabindex="-1">← Back to the hive</button>
-    <p class="hive-hint" id="hive-hint">Drag to look around · click a cell to open a project</p>
+    <p class="hive-hint" id="hive-hint">Click a cell to open a project</p>
     <div class="hive-readout" id="hive-readout">
       <div class="hive-readout-n" id="hive-readout-n"></div>
       <div class="hive-readout-t" id="hive-readout-t"></div>
@@ -114,7 +118,7 @@
     </div>
   </div>
   <p class="hive-caption">
-    Click the hive to fly inside, then drag or use the arrow keys to look around the honeycomb wall — or jump straight to
+    Click the hive to look inside, then click a cell on the honeycomb wall to open a project — or jump straight to
     <a href="/to-do-list/">To-Do List</a> · <a href="/fpl/">FPL Team Manager</a>.
   </p>
 
@@ -123,7 +127,6 @@
   </footer>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="hive.js" defer></script>
 </body>
 </html>

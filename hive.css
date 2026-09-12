@@ -18,22 +18,63 @@
   overflow: hidden;
 }
 
-#hive-canvas {
+.hive-interior {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s linear;
 }
 
-#hive-canvas.visible { opacity: 1; }
+.hive-interior.visible { opacity: 1; pointer-events: auto; }
 
-#hive-canvas:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -3px;
+.hive-interior img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Cells are plain buttons positioned in JS from the artwork's own
+   rendered box (see layoutCells in hive.js), so they track the image
+   exactly under object-fit: contain regardless of the scene's aspect
+   ratio. The hex clip-path is a pointy-top hexagon, matching the cells
+   drawn in hive-interior.png. */
+.hive-cell {
+  position: absolute;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+  transition: transform 0.15s ease;
+}
+
+.hive-cell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+  border: 3px solid transparent;
+  background: transparent;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.hive-cell:hover,
+.hive-cell:focus-visible {
+  transform: scale(1.05);
+  outline: none;
+}
+
+.hive-cell:hover::after,
+.hive-cell:focus-visible::after {
+  border-color: #ec3013;
+  background-color: rgba(236, 48, 19, 0.16);
 }
 
 .hive-live-region {
