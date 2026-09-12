@@ -127,7 +127,6 @@
   box-shadow:
     inset 0 -6px 10px rgba(74, 45, 0, 0.38),
     inset 0 0 0 1px rgba(7, 10, 16, 0.65);
-  transition: transform 0.15s ease;
   background-image:
     radial-gradient(120% 100% at 28% 18%, rgba(255, 255, 255, 0.55), transparent 42%),
     linear-gradient(160deg, var(--hive-fill-hi), var(--hive-fill-lo) 78%);
@@ -138,12 +137,6 @@
      it -- the drop-shadow glow on .hive-hex above is the sole focus color
      signal, so this should read as "lit up," not a different-colored rim. */
   background: linear-gradient(155deg, #6E9BE8, #2B4785 60%);
-}
-
-.hive-hex:hover .hive-hex-fill,
-.hive-hex:focus-visible .hive-hex-fill {
-  transform: translateY(-3px);
-  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.4));
 }
 
 .hive-hex-num {
