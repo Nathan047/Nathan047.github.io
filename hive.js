@@ -20,19 +20,6 @@
   var modalEl = modalBackdrop ? modalBackdrop.querySelector('.hive-modal') : null;
   if (!landing || !interior) return;
 
-  // Arriving with a #hash (e.g. the sub-apps' "All projects" back link)
-  // relies on the browser's native scroll-to-fragment, which fires before
-  // hive.png (a large, unsized <img>) has finished loading and pushed the
-  // rest of the page down -- so it lands well short of the target and never
-  // re-corrects. Re-run the scroll once everything (images included) has
-  // actually settled.
-  if (window.location.hash) {
-    window.addEventListener('load', function () {
-      var target = document.getElementById(window.location.hash.slice(1));
-      if (target) target.scrollIntoView();
-    });
-  }
-
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var mobileQuery = window.matchMedia ? window.matchMedia('(max-width: 640px)') : null;
   function isMobile() { return mobileQuery ? mobileQuery.matches : window.innerWidth <= 640; }
@@ -278,6 +265,45 @@
 
   buildHiveComb();
   positionHiveComb();
+
+  // Arriving with a #hash (e.g. the sub-apps' "All projects" back link)
+  // relies on the browser's native scroll-to-fragment, which fires before
+  // hive.png (a large, unsized <img>) has finished loading and pushed the
+  // rest of the page down -- so it lands well short of the target and never
+  // re-corrects. Re-run the scroll once everything (images included) has
+  // actually settled. This has to run after buildHiveComb()/positionHiveComb()
+  // above (and after `mode` is initialized) since the immediate branch below
+  // can call enterHive() synchronously, before the page's own `load` event.
+  if (window.location.hash) {
+    var landOnHash = function () {
+      var hash = window.location.hash.slice(1);
+      // On desktop the honeycomb interior -- not the plain zero-JS list
+      // further down the page -- is the primary way to browse projects (see
+      // the mobile media query in hive.css), so a trip back from a project
+      // should reopen straight into it rather than land on the exterior
+      // hive with the static list scrolled into view behind it. Mobile has
+      // no interior to open (enterHive() no-ops there), so it keeps landing
+      // on the static list, which is already its primary interface.
+      if (hash === 'all-projects' && !isMobile()) {
+        enterHive();
+        hiveScene.scrollIntoView();
+        return;
+      }
+      var target = document.getElementById(hash);
+      if (target) target.scrollIntoView();
+    };
+    // 'load' fires only once, so if hive.png is already cached from an
+    // earlier visit (the common case for this back-link, since the user was
+    // just on this same hive minutes ago) it can finish -- and 'load' can
+    // fire -- before this deferred script even starts running, in which case
+    // the listener below would never fire at all. Run immediately in that
+    // case instead of waiting on an event that has already happened.
+    if (document.readyState === 'complete') {
+      landOnHash();
+    } else {
+      window.addEventListener('load', landOnHash);
+    }
+  }
 
   // The comb's cell positions/sizes are computed in JS pixels (not a scaling
   // SVG viewBox), so a viewport width change that doesn't cross the mobile
