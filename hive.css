@@ -56,7 +56,13 @@
 }
 
 .hive-landing img {
-  width: min(100%, 92%);
+  /* hive.png is square, but .hive-scene is short and wide, so this must
+     cap by both axes -- constraining width alone let the image render
+     taller than the scene and get clipped by its overflow:hidden, which
+     read as the artwork being zoomed in. */
+  max-width: 92%;
+  max-height: 92%;
+  width: auto;
   height: auto;
   display: block;
 }
