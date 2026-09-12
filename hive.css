@@ -2,11 +2,16 @@
 
 :root {
   /* Tokens scoped to the honeycomb interior only -- everything else in this
-     file uses the site-wide tokens declared in index.html's own :root. */
-  --hive-stage: #200f06;
-  --hive-stage-2: #1a0c05;
-  --hive-rim: #7a4110;
-  --hive-rim-hi: #a85f1a;
+     file uses the site-wide tokens declared in index.html's own :root.
+     The stage/rim tones below are deliberately derived from the site's own
+     --paper/--surface/--line navy tokens (with a touch of warmth mixed in)
+     so the interior reads as a room inside this navy site rather than a
+     separate warm-brown world. Only the hex fill stays warm/amber -- that's
+     the honey glow, meant to read like lit windows in a dark room. */
+  --hive-stage: #1b2a40;
+  --hive-stage-2: #101b2a;
+  --hive-rim: #263c58;
+  --hive-rim-hi: #3a5c86;
   --hive-fill-hi: #ffce6e;
   --hive-fill-lo: #d68a1f;
   --hive-ink: #3b1803;
@@ -52,7 +57,13 @@
   position: absolute;
   inset: 0;
   background-repeat: repeat;
-  opacity: 0.5;
+  opacity: 0.24;
+  /* Fade the tiled pattern out toward the frame edges so a couple of real
+     hexagons read as content sitting in front of ambient wall texture,
+     rather than a mostly-empty room -- opaque through the center ~55%,
+     fading to transparent at the stage's edges. */
+  -webkit-mask-image: radial-gradient(ellipse 62% 62% at 50% 50%, #000 0%, #000 55%, transparent 100%);
+  mask-image: radial-gradient(ellipse 62% 62% at 50% 50%, #000 0%, #000 55%, transparent 100%);
 }
 
 /* The comb is generated in JS (see buildHiveComb()/positionHiveComb() in
@@ -107,16 +118,23 @@
   align-items: center;
   justify-content: center;
   gap: 2px;
-  box-shadow: inset 0 -6px 10px rgba(59, 24, 3, 0.35);
+  /* Depth shadow (warm, part of the honey glow) plus a 1px dark hairline
+     tinted toward the navy rim/stage -- crisps up the silhouette where the
+     rim and fill gradients would otherwise abut with no hard edge. */
+  box-shadow:
+    inset 0 -6px 10px rgba(59, 24, 3, 0.35),
+    inset 0 0 0 1px rgba(16, 27, 42, 0.6);
   transition: transform 0.15s ease;
   background-image:
     radial-gradient(120% 100% at 28% 18%, rgba(255, 255, 255, 0.55), transparent 42%),
-    linear-gradient(160deg, var(--hive-fill-hi), var(--hive-fill-lo) 78%),
-    repeating-linear-gradient(115deg, rgba(59, 24, 3, 0.05) 0 2px, transparent 2px 7px);
+    linear-gradient(160deg, var(--hive-fill-hi), var(--hive-fill-lo) 78%);
 }
 
 .hive-hex:focus-visible .hive-hex-rim {
-  background: linear-gradient(155deg, #ff6a4a, #ec3013 60%);
+  /* Brighten the rim's own navy gradient on focus rather than hue-shifting
+     it -- the #ec3013 outline on .hive-hex below is the sole focus color
+     signal, so this should read as "lit up," not a different-colored rim. */
+  background: linear-gradient(155deg, #5c82b3, #2f4a6b 60%);
 }
 
 .hive-hex:hover .hive-hex-fill,
