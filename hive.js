@@ -292,7 +292,7 @@
       // transition is for a visible click-triggered change of state; here
       // the exterior was never actually seen, so fading from it would just
       // show a flash of the wrong view before landing on the right one.
-      applyMode(true);
+      applyMode(true, true);
     }
 
     // The scroll itself still waits for full load: the browser's native
@@ -352,7 +352,19 @@
     }
   }
 
-  function applyMode(showInside) {
+  function applyMode(showInside, instant) {
+    // .hive-interior/.hive-back/.hive-hint each have their own opacity (and,
+    // for the back button, transform) transition, normally invisible because
+    // crossfadeTo() only ever swaps them while the separate .hive-fade
+    // overlay is covering the screen. The instant hash-triggered open below
+    // has no such cover, so without this those transitions would still play
+    // on their own -- exactly the flash this is meant to avoid. Suppress
+    // them for one swap, then hand back to the stylesheet so the normal,
+    // overlay-covered crossfadeTo() path is unaffected.
+    var instantEls = instant ? [interior, backBtn, hintEl] : null;
+    if (instantEls) {
+      instantEls.forEach(function (el) { el.style.transition = 'none'; });
+    }
     if (showInside) {
       landing.style.display = 'none';
       interior.classList.add('visible');
@@ -391,6 +403,17 @@
       mode = 'landing';
       readoutEl.classList.remove('visible');
       announce('Back at the hive.');
+    }
+    if (instantEls) {
+      // Force a reflow so the class/attribute changes above are committed
+      // with transitions off, before restoring them on the next frame --
+      // restoring on the same tick could still let the browser coalesce it
+      // with the change above into one (still-instant) style pass, but
+      // waiting a frame is the reliable way to guarantee that never happens.
+      void interior.offsetHeight;
+      requestAnimationFrame(function () {
+        instantEls.forEach(function (el) { el.style.transition = ''; });
+      });
     }
   }
 
