@@ -284,8 +284,12 @@
       // hive with the static list scrolled into view behind it. Mobile has
       // no interior to open (enterHive() no-ops there), so it keeps landing
       // on the static list, which is already its primary interface.
-      if (hash === 'all-projects' && !isMobile()) {
-        enterHive();
+      if (hash === 'all-projects' && !isMobile() && mode === 'landing') {
+        // Show the interior directly, skipping crossfadeTo()'s fade -- that
+        // transition is for a visible click-triggered change of state; here
+        // the exterior was never actually seen, so fading from it just
+        // shows a flash of the wrong view before landing on the right one.
+        applyMode(true);
         hiveScene.scrollIntoView();
         return;
       }
@@ -336,48 +340,52 @@
     }
   }
 
+  function applyMode(showInside) {
+    if (showInside) {
+      landing.style.display = 'none';
+      interior.classList.add('visible');
+      interior.setAttribute('aria-hidden', 'false');
+      cellEls.forEach(function (el) { el.tabIndex = isMobile() ? -1 : 0; });
+      backBtn.classList.add('visible');
+      backBtn.tabIndex = 0;
+      hintEl.classList.add('visible');
+      // Move focus into the interior BEFORE hiding the landing subtree from
+      // assistive tech -- aria-hidden must never be set on an ancestor of
+      // document.activeElement, even transiently.
+      backBtn.focus();
+      landing.setAttribute('aria-hidden', 'true');
+      mode = 'inside';
+      announce('Inside the hive. ' + PROJECTS.length + ' projects on the wall.');
+    } else {
+      landing.style.display = '';
+      landing.setAttribute('aria-hidden', 'false');
+      // Move focus back to the landing element BEFORE hiding the interior
+      // subtree (a hex cell may still hold focus here) -- same ordering
+      // requirement as the entering branch above, mirrored. But only steal
+      // focus at all if it's currently somewhere inside the hive scene
+      // (e.g. a hex cell or the back button) -- if the user has since
+      // moved focus elsewhere on the page (e.g. the static project list),
+      // e.g. because this exit was triggered by a resize crossing the
+      // mobile breakpoint out from under them, leave their focus alone.
+      if (hiveScene && hiveScene.contains(document.activeElement)) {
+        landing.focus();
+      }
+      interior.classList.remove('visible');
+      interior.setAttribute('aria-hidden', 'true');
+      cellEls.forEach(function (el) { el.tabIndex = -1; });
+      backBtn.classList.remove('visible');
+      backBtn.tabIndex = -1;
+      hintEl.classList.remove('visible');
+      mode = 'landing';
+      readoutEl.classList.remove('visible');
+      announce('Back at the hive.');
+    }
+  }
+
   function crossfadeTo(showInside) {
     fadeEl.classList.add('active');
     setTimeout(function () {
-      if (showInside) {
-        landing.style.display = 'none';
-        interior.classList.add('visible');
-        interior.setAttribute('aria-hidden', 'false');
-        cellEls.forEach(function (el) { el.tabIndex = isMobile() ? -1 : 0; });
-        backBtn.classList.add('visible');
-        backBtn.tabIndex = 0;
-        hintEl.classList.add('visible');
-        // Move focus into the interior BEFORE hiding the landing subtree from
-        // assistive tech -- aria-hidden must never be set on an ancestor of
-        // document.activeElement, even transiently.
-        backBtn.focus();
-        landing.setAttribute('aria-hidden', 'true');
-        mode = 'inside';
-        announce('Inside the hive. ' + PROJECTS.length + ' projects on the wall.');
-      } else {
-        landing.style.display = '';
-        landing.setAttribute('aria-hidden', 'false');
-        // Move focus back to the landing element BEFORE hiding the interior
-        // subtree (a hex cell may still hold focus here) -- same ordering
-        // requirement as the entering branch above, mirrored. But only steal
-        // focus at all if it's currently somewhere inside the hive scene
-        // (e.g. a hex cell or the back button) -- if the user has since
-        // moved focus elsewhere on the page (e.g. the static project list),
-        // e.g. because this exit was triggered by a resize crossing the
-        // mobile breakpoint out from under them, leave their focus alone.
-        if (hiveScene && hiveScene.contains(document.activeElement)) {
-          landing.focus();
-        }
-        interior.classList.remove('visible');
-        interior.setAttribute('aria-hidden', 'true');
-        cellEls.forEach(function (el) { el.tabIndex = -1; });
-        backBtn.classList.remove('visible');
-        backBtn.tabIndex = -1;
-        hintEl.classList.remove('visible');
-        mode = 'landing';
-        readoutEl.classList.remove('visible');
-        announce('Back at the hive.');
-      }
+      applyMode(showInside);
       requestAnimationFrame(function () {
         fadeEl.classList.remove('active');
       });
