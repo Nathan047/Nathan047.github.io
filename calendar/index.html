@@ -18,6 +18,7 @@
     --accent: #FFC93C;
     --on-accent: #070A10;
     --bad: #F2796B;
+    --work: #4D8DFF;
   }
 
   * { box-sizing: border-box; }
@@ -154,12 +155,11 @@
   }
 
   .cal-day {
+    position: relative;
     aspect-ratio: 1;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: 6px;
@@ -181,7 +181,8 @@
     color: var(--on-accent);
   }
 
-  .cal-day.is-selected .cal-day-dot { background: var(--on-accent); }
+  .cal-day.is-selected .cal-day-dot,
+  .cal-day.is-selected .cal-day-work-dot { background: var(--on-accent); }
 
   .cal-day-empty {
     background: none;
@@ -189,12 +190,53 @@
     cursor: default;
   }
 
+  /* Work-rota marker (top) and has-a-note marker (bottom) sit on opposite
+     edges of the cell so both can show at once without crowding the date
+     number, which stays the only flex-centered child. */
+  .cal-day-work-dot,
   .cal-day-dot {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
     width: 5px;
     height: 5px;
     border-radius: 50%;
+  }
+
+  .cal-day-work-dot {
+    top: 6px;
+    background: var(--work);
+  }
+
+  .cal-day-dot {
+    bottom: 6px;
     background: var(--accent);
   }
+
+  .cal-legend {
+    display: flex;
+    gap: 1.1rem;
+    margin: -0.75rem 0 1.5rem;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+  }
+
+  .cal-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .cal-legend-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex: none;
+  }
+
+  .cal-legend-dot--work { background: var(--work); }
+  .cal-legend-dot--note { background: var(--accent); }
 
   .cal-note-panel {
     padding: 1rem 1.1rem;
@@ -292,6 +334,10 @@
     <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
   </div>
   <div class="cal-grid" id="cal-grid-days"></div>
+  <div class="cal-legend">
+    <span class="cal-legend-item"><span class="cal-legend-dot cal-legend-dot--work" aria-hidden="true"></span>Work day</span>
+    <span class="cal-legend-item"><span class="cal-legend-dot cal-legend-dot--note" aria-hidden="true"></span>Has a note</span>
+  </div>
 
   <div class="cal-note-panel">
     <div class="cal-note-date" id="cal-note-date"></div>
@@ -329,6 +375,32 @@
   var notes = loadNotes();
   var today = new Date();
 
+  // Work rota: a 2-week rotating pattern. Week 0 (the anchor week below,
+  // and every 2nd week after/before it) works Wed-Sun; week 1 works
+  // Tue-Thu. Update WORK_ROTA_ANCHOR_MONDAY (any Monday that starts a
+  // "Wed-Sun" week) if the rota itself ever shifts.
+  var WORK_ROTA_ANCHOR_MONDAY = new Date(2026, 8, 14); // Monday, Sep 14 2026
+  var WORK_ROTA_WEEKDAYS = [
+    [3, 4, 5, 6, 0], // week 0: Wed, Thu, Fri, Sat, Sun
+    [2, 3, 4]        // week 1: Tue, Wed, Thu
+  ];
+
+  function utcDayCount(d) {
+    return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
+  }
+
+  function mondayOf(d) {
+    var day = d.getDay(); // 0 = Sun .. 6 = Sat
+    var diff = day === 0 ? -6 : 1 - day;
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() + diff);
+  }
+
+  function isWorkDay(d) {
+    var weeksSince = Math.floor((utcDayCount(mondayOf(d)) - utcDayCount(WORK_ROTA_ANCHOR_MONDAY)) / 7);
+    var weekIndex = ((weeksSince % 2) + 2) % 2; // normalize to 0/1 for negative weeksSince too
+    return WORK_ROTA_WEEKDAYS[weekIndex].indexOf(d.getDay()) !== -1;
+  }
+
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
   function dateKey(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
   function parseKey(key) {
@@ -358,10 +430,13 @@
       var isToday = key === todayKey;
       var isSelected = key === selectedKey;
       var hasNote = !!(notes[key] && notes[key].trim());
-      var label = MONTH_NAMES[viewMonth] + ' ' + day + (hasNote ? ', has a note' : '');
+      var isWork = isWorkDay(new Date(viewYear, viewMonth, day));
+      var label = MONTH_NAMES[viewMonth] + ' ' + day +
+        (isWork ? ', work day' : '') + (hasNote ? ', has a note' : '');
       cells.push(
         '<button type="button" class="cal-day' + (isToday ? ' is-today' : '') + (isSelected ? ' is-selected' : '') +
         '" data-key="' + key + '" aria-label="' + label + '" aria-pressed="' + isSelected + '">' +
+          (isWork ? '<span class="cal-day-work-dot" aria-hidden="true"></span>' : '') +
           '<span class="cal-day-num">' + day + '</span>' +
           (hasNote ? '<span class="cal-day-dot" aria-hidden="true"></span>' : '') +
         '</button>'
@@ -374,7 +449,8 @@
 
   function renderNotePanel() {
     var d = parseKey(selectedKey);
-    document.getElementById('cal-note-date').textContent = formatLong(d);
+    document.getElementById('cal-note-date').textContent =
+      formatLong(d) + (isWorkDay(d) ? ' · Work day' : '');
     document.getElementById('cal-note-input').value = notes[selectedKey] || '';
     document.getElementById('cal-note-delete').hidden = !notes[selectedKey];
   }
