@@ -293,6 +293,13 @@
       // the exterior was never actually seen, so fading from it would just
       // show a flash of the wrong view before landing on the right one.
       applyMode(true, true);
+      // Drop the hash once it's been acted on. Otherwise it just sits in
+      // the URL indefinitely -- so exiting back to the exterior (the back
+      // button) and then simply reloading the page (a hard refresh, or even
+      // just re-opening a tab restored from history) would see the same
+      // #all-projects hash and reopen the interior all over again, even
+      // though the user is looking at, and asked to reload, the exterior.
+      history.replaceState(null, '', location.pathname + location.search);
     }
 
     // The scroll itself still waits for full load: the browser's native
