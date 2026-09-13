@@ -306,6 +306,72 @@
   .cal-note-delete:hover { color: var(--bad); }
   .cal-note-delete:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+  .cal-range-panel {
+    padding: 1rem 1.1rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+  }
+
+  .cal-range-title {
+    margin-bottom: 0.65rem;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+    color: var(--ink-soft);
+  }
+
+  .cal-range-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .cal-range-row input[type="date"],
+  .cal-range-row input[type="text"] {
+    padding: 0.6rem 0.8rem;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--ink);
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: 0.9rem;
+    color-scheme: dark;
+  }
+
+  .cal-range-row input[type="text"] {
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .cal-range-row input::placeholder { color: var(--ink-faint); }
+  .cal-range-row input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .cal-range-to {
+    color: var(--ink-faint);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.78rem;
+  }
+
+  .cal-range-row button {
+    flex: none;
+    padding: 0.6rem 1.05rem;
+    background: var(--accent);
+    color: var(--on-accent);
+    border: none;
+    border-radius: 6px;
+    font-family: "IBM Plex Sans", sans-serif;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: filter 0.15s ease;
+  }
+
+  .cal-range-row button:hover { filter: brightness(1.08); }
+  .cal-range-row button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
   #footer {
     font-family: "IBM Plex Mono", monospace;
     font-size: 0.8rem;
@@ -346,6 +412,17 @@
       <button type="submit">Save</button>
     </form>
     <button type="button" class="cal-note-delete" id="cal-note-delete" hidden>Delete note</button>
+  </div>
+
+  <div class="cal-range-panel">
+    <div class="cal-range-title">Add the same note to a range of days</div>
+    <form class="cal-range-row" id="cal-range-form" autocomplete="off">
+      <input type="date" id="cal-range-start" aria-label="Start date" required>
+      <span class="cal-range-to">to</span>
+      <input type="date" id="cal-range-end" aria-label="End date" required>
+      <input type="text" id="cal-range-note" placeholder="e.g. Holiday" aria-label="Note text" required>
+      <button type="submit">Apply</button>
+    </form>
   </div>
 
   <footer id="footer"></footer>
@@ -511,6 +588,31 @@
     delete notes[selectedKey];
     saveNotes();
     render();
+  });
+
+  document.getElementById('cal-range-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var startInput = document.getElementById('cal-range-start');
+    var endInput = document.getElementById('cal-range-end');
+    var text = document.getElementById('cal-range-note').value.trim();
+    if (!startInput.value || !endInput.value || !text) return;
+
+    // <input type="date">'s value is always "YYYY-MM-DD", the same shape
+    // as our own dateKey()s, so it can be parsed with parseKey() directly.
+    var start = parseKey(startInput.value);
+    var end = parseKey(endInput.value);
+    if (start > end) { var tmp = start; start = end; end = tmp; }
+
+    var cursor = new Date(start);
+    while (cursor <= end) {
+      notes[dateKey(cursor)] = text;
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    saveNotes();
+
+    selectedKey = dateKey(start);
+    goToMonth(start.getFullYear(), start.getMonth());
+    e.target.reset();
   });
 
   render();
