@@ -1097,7 +1097,7 @@
   }
 
   document.getElementById('cal-export-btn').addEventListener('click', function () {
-    var payload = { notes: notes, holidays: holidays, workOverrides: workOverrides };
+    var payload = { notes: notes, holidays: holidays, workOverrides: workOverrides, rota: rota };
     var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
@@ -1122,11 +1122,15 @@
         var importedNotes = asObject(data.notes);
         var importedHolidays = asObject(data.holidays);
         var importedOverrides = asObject(data.workOverrides);
+        var importedRota = (data.rota && typeof data.rota === 'object' &&
+          typeof data.rota.anchorMonday === 'string' &&
+          Array.isArray(data.rota.weekA) && Array.isArray(data.rota.weekB)) ? data.rota : null;
+        var rotaChanged = importedRota && JSON.stringify(importedRota) !== JSON.stringify(rota);
         var noteCount = Object.keys(importedNotes).length;
         var holidayCount = Object.keys(importedHolidays).length;
         var overrideCount = Object.keys(importedOverrides).length;
 
-        if (!noteCount && !holidayCount && !overrideCount) {
+        if (!noteCount && !holidayCount && !overrideCount && !importedRota) {
           statusEl.textContent = "That file didn't contain any calendar data.";
           return;
         }
@@ -1143,6 +1147,7 @@
         if (overwriteNotes.length) overwriteParts.push(overwriteNotes.length + ' note' + (overwriteNotes.length === 1 ? '' : 's'));
         if (overwriteHolidays.length) overwriteParts.push(overwriteHolidays.length + ' holiday' + (overwriteHolidays.length === 1 ? '' : 's'));
         if (overwriteOverrides.length) overwriteParts.push(overwriteOverrides.length + ' work override' + (overwriteOverrides.length === 1 ? '' : 's'));
+        if (rotaChanged) overwriteParts.push('your work rota settings');
 
         if (overwriteParts.length) {
           var proceed = window.confirm(
@@ -1161,10 +1166,17 @@
         saveNotes();
         saveHolidays();
         saveWorkOverrides();
+        if (importedRota) {
+          rota = importedRota;
+          saveRota();
+          renderRota();
+        }
         render();
-        statusEl.textContent = 'Imported ' + noteCount + ' note' + (noteCount === 1 ? '' : 's') +
+        var summary = 'Imported ' + noteCount + ' note' + (noteCount === 1 ? '' : 's') +
           ', ' + holidayCount + ' holiday' + (holidayCount === 1 ? '' : 's') +
           ', ' + overrideCount + ' work override' + (overrideCount === 1 ? '' : 's') + '.';
+        if (importedRota) summary += ' Rota settings updated.';
+        statusEl.textContent = summary;
       } catch (err) {
         statusEl.textContent = "Couldn't read that file — is it a Hive Calendar backup?";
       }
