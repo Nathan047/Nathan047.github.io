@@ -97,6 +97,11 @@
       name: 'FPL Team Manager', status: 'Shipped', label: '02', href: '/fpl/',
       body: "A squad builder for my Fantasy Premier League team — real prices and points, with budget and quota rules enforced live.",
       tags: ['HTML', 'JavaScript', 'Excel']
+    },
+    {
+      name: 'Calendar', status: 'Shipped', label: '03', href: '/calendar/',
+      body: "A month at a glance — click a day to leave yourself a note.",
+      tags: ['HTML', 'JavaScript']
     }
   ];
 
