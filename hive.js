@@ -266,37 +266,49 @@
   buildHiveComb();
   positionHiveComb();
 
-  // Arriving with a #hash (e.g. the sub-apps' "All projects" back link)
-  // relies on the browser's native scroll-to-fragment, which fires before
-  // hive.png (a large, unsized <img>) has finished loading and pushed the
-  // rest of the page down -- so it lands well short of the target and never
-  // re-corrects. Re-run the scroll once everything (images included) has
-  // actually settled. This has to run after buildHiveComb()/positionHiveComb()
-  // above (and after `mode` is initialized) since the immediate branch below
-  // can call enterHive() synchronously, before the page's own `load` event.
+  // Arriving with a #hash (e.g. the sub-apps' "All projects" back link).
   if (window.location.hash) {
+    var hash = window.location.hash.slice(1);
+
+    // On desktop the honeycomb interior -- not the plain zero-JS list
+    // further down the page -- is the primary way to browse projects (see
+    // the mobile media query in hive.css), so a trip back from a project
+    // should reopen straight into it rather than land on the exterior hive.
+    // This has to happen right here, synchronously, rather than waiting for
+    // the page's `load` event below: on a real network (unlike the fast
+    // local dev server), hive.png and the web fonts can take a while to
+    // finish loading, and until this script changes it the DOM's default
+    // state is the exterior -- so waiting for `load` meant the user sat
+    // looking at the exterior for that whole stretch before it flipped to
+    // the interior. That wait was never actually necessary: .hive-scene has
+    // a fixed height and `overflow: hidden`, so hiding the (possibly still
+    // loading) exterior image inside it can't cause any layout shift.
+    // Mobile has no interior to open (enterHive()/applyMode(true) below is
+    // only reached off this branch), so it keeps landing on the static
+    // list, which is already its primary interface there.
+    var openedInteriorForHash = hash === 'all-projects' && !isMobile() && mode === 'landing';
+    if (openedInteriorForHash) {
+      // Show the interior directly, skipping crossfadeTo()'s fade -- that
+      // transition is for a visible click-triggered change of state; here
+      // the exterior was never actually seen, so fading from it would just
+      // show a flash of the wrong view before landing on the right one.
+      applyMode(true);
+    }
+
+    // The scroll itself still waits for full load: the browser's native
+    // scroll-to-fragment fires before hive.png/web fonts have settled the
+    // page's final layout, so it can land short of the target and never
+    // re-corrects on its own. Re-run it once everything has actually
+    // settled.
     var landOnHash = function () {
-      var hash = window.location.hash.slice(1);
-      // On desktop the honeycomb interior -- not the plain zero-JS list
-      // further down the page -- is the primary way to browse projects (see
-      // the mobile media query in hive.css), so a trip back from a project
-      // should reopen straight into it rather than land on the exterior
-      // hive with the static list scrolled into view behind it. Mobile has
-      // no interior to open (enterHive() no-ops there), so it keeps landing
-      // on the static list, which is already its primary interface.
-      if (hash === 'all-projects' && !isMobile() && mode === 'landing') {
-        // Show the interior directly, skipping crossfadeTo()'s fade -- that
-        // transition is for a visible click-triggered change of state; here
-        // the exterior was never actually seen, so fading from it just
-        // shows a flash of the wrong view before landing on the right one.
-        applyMode(true);
+      if (openedInteriorForHash) {
         hiveScene.scrollIntoView();
         return;
       }
       var target = document.getElementById(hash);
       if (target) target.scrollIntoView();
     };
-    // 'load' fires only once, so if hive.png is already cached from an
+    // 'load' fires only once, so if the page is already cached from an
     // earlier visit (the common case for this back-link, since the user was
     // just on this same hive minutes ago) it can finish -- and 'load' can
     // fire -- before this deferred script even starts running, in which case
