@@ -15,6 +15,10 @@
   --hive-fill-hi: #FFDD7A;
   --hive-fill-lo: #E9A61B;
   --hive-ink: #131007;
+  /* Shared by .hive-hex and its .hive-hex-rim/.hive-hex-fill children so
+     the two can never drift apart -- see the .hive-hex rule for why the
+     button itself needs this too, not just its decorative children. */
+  --hive-hex-clip: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
 }
 
 /* Color note: #13203B below is a plain hardcoded fallback background (not
@@ -99,6 +103,16 @@ html.hive-pending-interior .hive-interior { opacity: 1; pointer-events: auto; }
   background: none;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  /* Without this, the button's real hit-box is the full rectangle, not the
+     hexagon it visually looks like -- and since row spacing (1.5x radius)
+     is less than a hex's height (2x radius) so rows nest into each other's
+     notches, adjacent rows' rectangles genuinely overlap. A click in that
+     overlap could land on the wrong project once the comb grows past a
+     single row (2 projects fits in one row today, so this was latent, not
+     yet visible). Clipping the button itself to the same hexagon shape as
+     its .hive-hex-rim/.hive-hex-fill children makes the real hit area match
+     what's actually drawn, closing the overlap entirely. */
+  clip-path: var(--hive-hex-clip);
 }
 
 .hive-hex:focus-visible {
@@ -114,7 +128,7 @@ html.hive-pending-interior .hive-interior { opacity: 1; pointer-events: auto; }
 .hive-hex-fill {
   position: absolute;
   inset: 0;
-  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  clip-path: var(--hive-hex-clip);
 }
 
 .hive-hex-rim {
