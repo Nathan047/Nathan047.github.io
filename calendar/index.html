@@ -408,6 +408,145 @@
   .cal-range-row button:hover { filter: brightness(1.08); }
   .cal-range-row button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
+  .cal-upcoming-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .cal-upcoming-empty {
+    margin: 0;
+    color: var(--ink-faint);
+    font-size: 0.85rem;
+  }
+
+  .cal-upcoming-btn {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--ink);
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: 0.88rem;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+  }
+
+  .cal-upcoming-btn:hover { border-color: var(--accent); }
+  .cal-upcoming-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .cal-upcoming-date {
+    flex: none;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.03em;
+    color: var(--ink-soft);
+    min-width: 3.6rem;
+  }
+
+  .cal-upcoming-note {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cal-upcoming-tag {
+    flex: none;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(99, 211, 160, 0.15);
+    color: var(--holiday);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  .cal-rota-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+  }
+
+  .cal-rota-row label {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+  }
+
+  .cal-rota-row input[type="date"] {
+    padding: 0.5rem 0.7rem;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--ink);
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: 0.88rem;
+    color-scheme: dark;
+  }
+
+  .cal-rota-row input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .cal-rota-week { margin-bottom: 0.9rem; }
+  .cal-rota-week:last-child { margin-bottom: 0; }
+
+  .cal-rota-week-label {
+    margin-bottom: 0.5rem;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .cal-rota-days {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .cal-rota-day {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.65rem;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--ink-soft);
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+
+  .cal-rota-day:has(input:checked) {
+    border-color: var(--work);
+    color: var(--ink);
+  }
+
+  .cal-rota-day input {
+    width: 14px;
+    height: 14px;
+    accent-color: var(--work);
+    cursor: pointer;
+  }
+
+  .cal-rota-day input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
   .cal-data-row {
     display: flex;
     flex-wrap: wrap;
@@ -474,6 +613,11 @@
     <span class="cal-legend-item"><span class="cal-legend-dot cal-legend-dot--note" aria-hidden="true"></span>Has a note</span>
   </div>
 
+  <div class="cal-range-panel">
+    <div class="cal-range-title">Upcoming</div>
+    <ul class="cal-upcoming-list" id="cal-upcoming-list"></ul>
+  </div>
+
   <div class="cal-note-panel">
     <div class="cal-note-date" id="cal-note-date"></div>
     <div class="cal-note-row">
@@ -511,6 +655,22 @@
   </div>
 
   <div class="cal-range-panel">
+    <div class="cal-range-title">Work rota</div>
+    <div class="cal-rota-row">
+      <label for="cal-rota-anchor">Week A starts</label>
+      <input type="date" id="cal-rota-anchor">
+    </div>
+    <div class="cal-rota-week">
+      <div class="cal-rota-week-label">Week A</div>
+      <div class="cal-rota-days" id="cal-rota-week-a"></div>
+    </div>
+    <div class="cal-rota-week">
+      <div class="cal-rota-week-label">Week B</div>
+      <div class="cal-rota-days" id="cal-rota-week-b"></div>
+    </div>
+  </div>
+
+  <div class="cal-range-panel">
     <div class="cal-range-title">Backup &amp; restore</div>
     <div class="cal-data-row">
       <button type="button" class="cal-data-btn" id="cal-export-btn">Export backup</button>
@@ -529,9 +689,11 @@
   var STORAGE_KEY = 'hive-calendar-notes';
   var HOLIDAY_STORAGE_KEY = 'hive-calendar-holidays';
   var WORK_OVERRIDE_STORAGE_KEY = 'hive-calendar-work-overrides';
+  var ROTA_STORAGE_KEY = 'hive-calendar-rota';
   var MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
   var WEEKDAY_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  var WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   function loadNotes() {
     try {
@@ -583,20 +745,40 @@
     } catch (e) {}
   }
 
+  // The work rota itself: a 2-week rotating pattern, editable in the
+  // "Work rota" panel rather than hardcoded, so a real schedule change
+  // doesn't require editing source. anchorMonday is the Monday that starts
+  // "Week A"; weekA/weekB are arrays of weekday numbers (0=Sun..6=Sat).
+  var DEFAULT_ROTA = {
+    anchorMonday: '2026-09-14', // Monday, Sep 14 2026
+    weekA: [3, 4, 5, 6, 0], // Wed, Thu, Fri, Sat, Sun
+    weekB: [2, 3, 4]        // Tue, Wed, Thu
+  };
+
+  function loadRota() {
+    try {
+      var raw = localStorage.getItem(ROTA_STORAGE_KEY);
+      var parsed = raw ? JSON.parse(raw) : null;
+      if (parsed && typeof parsed.anchorMonday === 'string' && Array.isArray(parsed.weekA) && Array.isArray(parsed.weekB)) {
+        return parsed;
+      }
+      return DEFAULT_ROTA;
+    } catch (e) {
+      return DEFAULT_ROTA;
+    }
+  }
+
+  function saveRota() {
+    try {
+      localStorage.setItem(ROTA_STORAGE_KEY, JSON.stringify(rota));
+    } catch (e) {}
+  }
+
   var notes = loadNotes();
   var holidays = loadHolidays();
   var workOverrides = loadWorkOverrides();
+  var rota = loadRota();
   var today = new Date();
-
-  // Work rota: a 2-week rotating pattern. Week 0 (the anchor week below,
-  // and every 2nd week after/before it) works Wed-Sun; week 1 works
-  // Tue-Thu. Update WORK_ROTA_ANCHOR_MONDAY (any Monday that starts a
-  // "Wed-Sun" week) if the rota itself ever shifts.
-  var WORK_ROTA_ANCHOR_MONDAY = new Date(2026, 8, 14); // Monday, Sep 14 2026
-  var WORK_ROTA_WEEKDAYS = [
-    [3, 4, 5, 6, 0], // week 0: Wed, Thu, Fri, Sat, Sun
-    [2, 3, 4]        // week 1: Tue, Wed, Thu
-  ];
 
   function utcDayCount(d) {
     return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
@@ -609,9 +791,11 @@
   }
 
   function isWorkDay(d) {
-    var weeksSince = Math.floor((utcDayCount(mondayOf(d)) - utcDayCount(WORK_ROTA_ANCHOR_MONDAY)) / 7);
+    var anchor = mondayOf(parseKey(rota.anchorMonday));
+    var weeksSince = Math.floor((utcDayCount(mondayOf(d)) - utcDayCount(anchor)) / 7);
     var weekIndex = ((weeksSince % 2) + 2) % 2; // normalize to 0/1 for negative weeksSince too
-    return WORK_ROTA_WEEKDAYS[weekIndex].indexOf(d.getDay()) !== -1;
+    var pattern = weekIndex === 0 ? rota.weekA : rota.weekB;
+    return pattern.indexOf(d.getDay()) !== -1;
   }
 
   // The rota's computed value, unless this specific day has an explicit
@@ -629,6 +813,10 @@
   }
   function formatLong(d) {
     return WEEKDAY_LONG[d.getDay()] + ', ' + MONTH_NAMES[d.getMonth()] + ' ' + d.getDate();
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   var viewYear = today.getFullYear();
@@ -696,10 +884,39 @@
       : '';
   }
 
+  // Lists the next few upcoming notes/holidays (today onward) so they can
+  // be scanned at a glance instead of paging month to month to find them.
+  function renderUpcoming() {
+    var todayKey = dateKey(today);
+    var keys = {};
+    Object.keys(notes).forEach(function (k) { if (notes[k] && notes[k].trim()) keys[k] = true; });
+    Object.keys(holidays).forEach(function (k) { if (holidays[k]) keys[k] = true; });
+
+    var upcoming = Object.keys(keys).filter(function (k) { return k >= todayKey; }).sort().slice(0, 8);
+    var listEl = document.getElementById('cal-upcoming-list');
+
+    if (!upcoming.length) {
+      listEl.innerHTML = '<li class="cal-upcoming-empty">Nothing coming up.</li>';
+      return;
+    }
+
+    listEl.innerHTML = upcoming.map(function (key) {
+      var d = parseKey(key);
+      var bits = '';
+      if (notes[key] && notes[key].trim()) bits += '<span class="cal-upcoming-note">' + escapeHtml(notes[key]) + '</span>';
+      if (holidays[key]) bits += '<span class="cal-upcoming-tag">Holiday</span>';
+      return '<li><button type="button" class="cal-upcoming-btn" data-key="' + key + '">' +
+        '<span class="cal-upcoming-date">' + MONTH_NAMES[d.getMonth()].slice(0, 3) + ' ' + d.getDate() + '</span>' +
+        bits +
+        '</button></li>';
+    }).join('');
+  }
+
   function render() {
     renderGrid();
     renderNotePanel();
     renderFooter();
+    renderUpcoming();
   }
 
   function goToMonth(year, month) {
@@ -728,6 +945,14 @@
     render();
   });
 
+  document.getElementById('cal-upcoming-list').addEventListener('click', function (e) {
+    var btn = e.target.closest('.cal-upcoming-btn');
+    if (!btn) return;
+    var d = parseKey(btn.dataset.key);
+    selectedKey = btn.dataset.key;
+    goToMonth(d.getFullYear(), d.getMonth());
+  });
+
   var noteSaveTimer = null;
 
   function commitNoteInput() {
@@ -741,6 +966,7 @@
     document.getElementById('cal-note-delete').hidden = !notes[selectedKey];
     refreshDayCell(selectedKey);
     renderFooter();
+    renderUpcoming();
   }
 
   document.getElementById('cal-note-input').addEventListener('input', function () {
@@ -819,6 +1045,53 @@
     e.target.reset();
   });
 
+  function renderRotaCheckboxes(containerId, pattern) {
+    var html = '';
+    for (var i = 0; i < 7; i++) {
+      html += '<label class="cal-rota-day"><input type="checkbox" data-day="' + i + '"' +
+        (pattern.indexOf(i) !== -1 ? ' checked' : '') + '>' + WEEKDAY_SHORT[i] + '</label>';
+    }
+    document.getElementById(containerId).innerHTML = html;
+  }
+
+  function renderRota() {
+    document.getElementById('cal-rota-anchor').value = rota.anchorMonday;
+    renderRotaCheckboxes('cal-rota-week-a', rota.weekA);
+    renderRotaCheckboxes('cal-rota-week-b', rota.weekB);
+  }
+
+  function updateRotaWeek(weekKey, day, checked) {
+    var set = rota[weekKey].slice();
+    var idx = set.indexOf(day);
+    if (checked && idx === -1) set.push(day);
+    if (!checked && idx !== -1) set.splice(idx, 1);
+    rota[weekKey] = set;
+    saveRota();
+    render();
+  }
+
+  document.getElementById('cal-rota-week-a').addEventListener('change', function (e) {
+    var cb = e.target.closest('input[type="checkbox"]');
+    if (!cb) return;
+    updateRotaWeek('weekA', Number(cb.dataset.day), cb.checked);
+  });
+
+  document.getElementById('cal-rota-week-b').addEventListener('change', function (e) {
+    var cb = e.target.closest('input[type="checkbox"]');
+    if (!cb) return;
+    updateRotaWeek('weekB', Number(cb.dataset.day), cb.checked);
+  });
+
+  document.getElementById('cal-rota-anchor').addEventListener('change', function (e) {
+    if (!e.target.value) return;
+    rota.anchorMonday = dateKey(mondayOf(parseKey(e.target.value)));
+    e.target.value = rota.anchorMonday; // snap the shown date to that week's Monday
+    saveRota();
+    render();
+  });
+
+  renderRota();
+
   function asObject(v) {
     return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
   }
@@ -860,7 +1133,28 @@
 
         // Merge rather than replace, so importing a backup never wipes out
         // data already saved on this device -- only adds to or overwrites
-        // matching days.
+        // matching days. But an overwrite is still a real loss for any day
+        // that already had something saved, so confirm it first instead of
+        // merging silently.
+        var overwriteNotes = Object.keys(importedNotes).filter(function (k) { return notes.hasOwnProperty(k); });
+        var overwriteHolidays = Object.keys(importedHolidays).filter(function (k) { return holidays.hasOwnProperty(k); });
+        var overwriteOverrides = Object.keys(importedOverrides).filter(function (k) { return workOverrides.hasOwnProperty(k); });
+        var overwriteParts = [];
+        if (overwriteNotes.length) overwriteParts.push(overwriteNotes.length + ' note' + (overwriteNotes.length === 1 ? '' : 's'));
+        if (overwriteHolidays.length) overwriteParts.push(overwriteHolidays.length + ' holiday' + (overwriteHolidays.length === 1 ? '' : 's'));
+        if (overwriteOverrides.length) overwriteParts.push(overwriteOverrides.length + ' work override' + (overwriteOverrides.length === 1 ? '' : 's'));
+
+        if (overwriteParts.length) {
+          var proceed = window.confirm(
+            'This backup will overwrite ' + overwriteParts.join(', ') + ' already saved on this device. Continue?'
+          );
+          if (!proceed) {
+            statusEl.textContent = 'Import cancelled — nothing was changed.';
+            e.target.value = '';
+            return;
+          }
+        }
+
         Object.assign(notes, importedNotes);
         Object.assign(holidays, importedHolidays);
         Object.assign(workOverrides, importedOverrides);
