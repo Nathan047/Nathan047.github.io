@@ -19,6 +19,7 @@
     --on-accent: #070A10;
     --bad: #F2796B;
     --work: #4D8DFF;
+    --holiday: #63D3A0;
   }
 
   * { box-sizing: border-box; }
@@ -182,7 +183,8 @@
   }
 
   .cal-day.is-selected .cal-day-dot,
-  .cal-day.is-selected .cal-day-work-dot { background: var(--on-accent); }
+  .cal-day.is-selected .cal-day-work-dot,
+  .cal-day.is-selected .cal-day-holiday-dot { background: var(--on-accent); }
 
   .cal-day-empty {
     background: none;
@@ -190,14 +192,14 @@
     cursor: default;
   }
 
-  /* Work-rota marker (top) and has-a-note marker (bottom) sit on opposite
-     edges of the cell so both can show at once without crowding the date
-     number, which stays the only flex-centered child. */
+  /* Up to three markers per cell, each in a fixed spot so they never
+     rearrange depending on which combination is present: work-rota at
+     top-center, holiday at bottom-left, has-a-note at bottom-right. The
+     date number stays the only flex-centered child. */
   .cal-day-work-dot,
+  .cal-day-holiday-dot,
   .cal-day-dot {
     position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
     width: 5px;
     height: 5px;
     border-radius: 50%;
@@ -205,11 +207,20 @@
 
   .cal-day-work-dot {
     top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
     background: var(--work);
+  }
+
+  .cal-day-holiday-dot {
+    bottom: 6px;
+    left: 8px;
+    background: var(--holiday);
   }
 
   .cal-day-dot {
     bottom: 6px;
+    right: 8px;
     background: var(--accent);
   }
 
@@ -236,6 +247,7 @@
   }
 
   .cal-legend-dot--work { background: var(--work); }
+  .cal-legend-dot--holiday { background: var(--holiday); }
   .cal-legend-dot--note { background: var(--accent); }
 
   .cal-note-panel {
@@ -305,6 +317,32 @@
 
   .cal-note-delete:hover { color: var(--bad); }
   .cal-note-delete:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .cal-note-extra {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+  }
+
+  .cal-holiday-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--ink-soft);
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+
+  .cal-holiday-toggle input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--holiday);
+    cursor: pointer;
+  }
+
+  .cal-holiday-toggle input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   .cal-range-panel {
     padding: 1rem 1.1rem;
@@ -402,6 +440,7 @@
   <div class="cal-grid" id="cal-grid-days"></div>
   <div class="cal-legend">
     <span class="cal-legend-item"><span class="cal-legend-dot cal-legend-dot--work" aria-hidden="true"></span>Work day</span>
+    <span class="cal-legend-item"><span class="cal-legend-dot cal-legend-dot--holiday" aria-hidden="true"></span>Holiday</span>
     <span class="cal-legend-item"><span class="cal-legend-dot cal-legend-dot--note" aria-hidden="true"></span>Has a note</span>
   </div>
 
@@ -411,16 +450,26 @@
       <input type="text" id="cal-note-input" placeholder="Add a note for this day…">
       <button type="submit">Save</button>
     </form>
-    <button type="button" class="cal-note-delete" id="cal-note-delete" hidden>Delete note</button>
+    <div class="cal-note-extra">
+      <label class="cal-holiday-toggle">
+        <input type="checkbox" id="cal-note-holiday">
+        Holiday
+      </label>
+      <button type="button" class="cal-note-delete" id="cal-note-delete" hidden>Delete note</button>
+    </div>
   </div>
 
   <div class="cal-range-panel">
-    <div class="cal-range-title">Add the same note to a range of days</div>
+    <div class="cal-range-title">Apply to a range of days</div>
     <form class="cal-range-row" id="cal-range-form" autocomplete="off">
       <input type="date" id="cal-range-start" aria-label="Start date" required>
       <span class="cal-range-to">to</span>
       <input type="date" id="cal-range-end" aria-label="End date" required>
-      <input type="text" id="cal-range-note" placeholder="e.g. Holiday" aria-label="Note text" required>
+      <input type="text" id="cal-range-note" placeholder="Note (optional)" aria-label="Note text">
+      <label class="cal-holiday-toggle">
+        <input type="checkbox" id="cal-range-holiday">
+        Holiday
+      </label>
       <button type="submit">Apply</button>
     </form>
   </div>
@@ -430,6 +479,7 @@
 
 <script>
   var STORAGE_KEY = 'hive-calendar-notes';
+  var HOLIDAY_STORAGE_KEY = 'hive-calendar-holidays';
   var MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
   var WEEKDAY_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -449,7 +499,25 @@
     } catch (e) {}
   }
 
+  // Holidays are their own true/false map, separate from freeform notes --
+  // a day can be a holiday, have a note, or both, independently.
+  function loadHolidays() {
+    try {
+      var raw = localStorage.getItem(HOLIDAY_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveHolidays() {
+    try {
+      localStorage.setItem(HOLIDAY_STORAGE_KEY, JSON.stringify(holidays));
+    } catch (e) {}
+  }
+
   var notes = loadNotes();
+  var holidays = loadHolidays();
   var today = new Date();
 
   // Work rota: a 2-week rotating pattern. Week 0 (the anchor week below,
@@ -507,14 +575,16 @@
       var isToday = key === todayKey;
       var isSelected = key === selectedKey;
       var hasNote = !!(notes[key] && notes[key].trim());
+      var isHoliday = !!holidays[key];
       var isWork = isWorkDay(new Date(viewYear, viewMonth, day));
       var label = MONTH_NAMES[viewMonth] + ' ' + day +
-        (isWork ? ', work day' : '') + (hasNote ? ', has a note' : '');
+        (isWork ? ', work day' : '') + (isHoliday ? ', holiday' : '') + (hasNote ? ', has a note' : '');
       cells.push(
         '<button type="button" class="cal-day' + (isToday ? ' is-today' : '') + (isSelected ? ' is-selected' : '') +
         '" data-key="' + key + '" aria-label="' + label + '" aria-pressed="' + isSelected + '">' +
           (isWork ? '<span class="cal-day-work-dot" aria-hidden="true"></span>' : '') +
           '<span class="cal-day-num">' + day + '</span>' +
+          (isHoliday ? '<span class="cal-day-holiday-dot" aria-hidden="true"></span>' : '') +
           (hasNote ? '<span class="cal-day-dot" aria-hidden="true"></span>' : '') +
         '</button>'
       );
@@ -530,6 +600,7 @@
       formatLong(d) + (isWorkDay(d) ? ' · Work day' : '');
     document.getElementById('cal-note-input').value = notes[selectedKey] || '';
     document.getElementById('cal-note-delete').hidden = !notes[selectedKey];
+    document.getElementById('cal-note-holiday').checked = !!holidays[selectedKey];
   }
 
   function renderFooter() {
@@ -590,12 +661,24 @@
     render();
   });
 
+  document.getElementById('cal-note-holiday').addEventListener('change', function (e) {
+    if (e.target.checked) {
+      holidays[selectedKey] = true;
+    } else {
+      delete holidays[selectedKey];
+    }
+    saveHolidays();
+    render();
+  });
+
   document.getElementById('cal-range-form').addEventListener('submit', function (e) {
     e.preventDefault();
     var startInput = document.getElementById('cal-range-start');
     var endInput = document.getElementById('cal-range-end');
     var text = document.getElementById('cal-range-note').value.trim();
-    if (!startInput.value || !endInput.value || !text) return;
+    var holidayCheck = document.getElementById('cal-range-holiday');
+    var markHoliday = holidayCheck.checked;
+    if (!startInput.value || !endInput.value || (!text && !markHoliday)) return;
 
     // <input type="date">'s value is always "YYYY-MM-DD", the same shape
     // as our own dateKey()s, so it can be parsed with parseKey() directly.
@@ -605,10 +688,13 @@
 
     var cursor = new Date(start);
     while (cursor <= end) {
-      notes[dateKey(cursor)] = text;
+      var key = dateKey(cursor);
+      if (text) notes[key] = text;
+      if (markHoliday) holidays[key] = true;
       cursor.setDate(cursor.getDate() + 1);
     }
     saveNotes();
+    saveHolidays();
 
     selectedKey = dateKey(start);
     goToMonth(start.getFullYear(), start.getMonth());
