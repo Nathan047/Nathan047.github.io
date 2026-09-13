@@ -320,9 +320,17 @@
 
   .cal-note-extra {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 0.6rem;
+  }
+
+  .cal-note-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.9rem;
   }
 
   .cal-holiday-toggle {
@@ -343,6 +351,13 @@
   }
 
   .cal-holiday-toggle input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .cal-workday-toggle input { accent-color: var(--work); }
+
+  /* Reuses the same muted look as "Delete note", but a swap/reset is not
+     destructive the way deleting a note is, so its hover color stays the
+     accent rather than the "bad" red. */
+  #cal-note-workday-reset:hover { color: var(--accent); }
 
   .cal-range-panel {
     padding: 1rem 1.1rem;
@@ -410,6 +425,38 @@
   .cal-range-row button:hover { filter: brightness(1.08); }
   .cal-range-row button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
+  .cal-data-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  .cal-data-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.6rem 1.05rem;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--ink);
+    font-family: "IBM Plex Sans", sans-serif;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+  }
+
+  .cal-data-btn:hover { border-color: var(--accent); }
+  .cal-data-btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .cal-data-status {
+    margin-top: 0.6rem;
+    min-height: 1.1em;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.75rem;
+    color: var(--ink-faint);
+  }
+
   #footer {
     font-family: "IBM Plex Mono", monospace;
     font-size: 0.8rem;
@@ -451,10 +498,17 @@
       <button type="submit">Save</button>
     </form>
     <div class="cal-note-extra">
-      <label class="cal-holiday-toggle">
-        <input type="checkbox" id="cal-note-holiday">
-        Holiday
-      </label>
+      <div class="cal-note-toggles">
+        <label class="cal-holiday-toggle cal-workday-toggle">
+          <input type="checkbox" id="cal-note-workday">
+          Work day
+        </label>
+        <label class="cal-holiday-toggle">
+          <input type="checkbox" id="cal-note-holiday">
+          Holiday
+        </label>
+        <button type="button" class="cal-note-delete" id="cal-note-workday-reset" hidden>Reset to rota</button>
+      </div>
       <button type="button" class="cal-note-delete" id="cal-note-delete" hidden>Delete note</button>
     </div>
   </div>
@@ -474,12 +528,25 @@
     </form>
   </div>
 
+  <div class="cal-range-panel">
+    <div class="cal-range-title">Backup &amp; restore</div>
+    <div class="cal-data-row">
+      <button type="button" class="cal-data-btn" id="cal-export-btn">Export backup</button>
+      <label class="cal-data-btn" for="cal-import-input">
+        Import backup
+        <input type="file" id="cal-import-input" accept="application/json,.json" hidden>
+      </label>
+    </div>
+    <div class="cal-data-status" id="cal-data-status" aria-live="polite"></div>
+  </div>
+
   <footer id="footer"></footer>
 </div>
 
 <script>
   var STORAGE_KEY = 'hive-calendar-notes';
   var HOLIDAY_STORAGE_KEY = 'hive-calendar-holidays';
+  var WORK_OVERRIDE_STORAGE_KEY = 'hive-calendar-work-overrides';
   var MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
   var WEEKDAY_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -516,8 +583,27 @@
     } catch (e) {}
   }
 
+  // Rota exceptions: a per-day true/false override for isWorkDay(), so a
+  // swapped shift or a one-off day off doesn't require lying via a note.
+  // Absent from this map, a day just uses the computed rota (below).
+  function loadWorkOverrides() {
+    try {
+      var raw = localStorage.getItem(WORK_OVERRIDE_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveWorkOverrides() {
+    try {
+      localStorage.setItem(WORK_OVERRIDE_STORAGE_KEY, JSON.stringify(workOverrides));
+    } catch (e) {}
+  }
+
   var notes = loadNotes();
   var holidays = loadHolidays();
+  var workOverrides = loadWorkOverrides();
   var today = new Date();
 
   // Work rota: a 2-week rotating pattern. Week 0 (the anchor week below,
@@ -544,6 +630,13 @@
     var weeksSince = Math.floor((utcDayCount(mondayOf(d)) - utcDayCount(WORK_ROTA_ANCHOR_MONDAY)) / 7);
     var weekIndex = ((weeksSince % 2) + 2) % 2; // normalize to 0/1 for negative weeksSince too
     return WORK_ROTA_WEEKDAYS[weekIndex].indexOf(d.getDay()) !== -1;
+  }
+
+  // The rota's computed value, unless this specific day has an explicit
+  // override on file (a swapped shift, a one-off day off or extra shift).
+  function effectiveIsWorkDay(d) {
+    var key = dateKey(d);
+    return workOverrides.hasOwnProperty(key) ? workOverrides[key] : isWorkDay(d);
   }
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
@@ -576,7 +669,7 @@
       var isSelected = key === selectedKey;
       var hasNote = !!(notes[key] && notes[key].trim());
       var isHoliday = !!holidays[key];
-      var isWork = isWorkDay(new Date(viewYear, viewMonth, day));
+      var isWork = effectiveIsWorkDay(new Date(viewYear, viewMonth, day));
       var label = MONTH_NAMES[viewMonth] + ' ' + day +
         (isWork ? ', work day' : '') + (isHoliday ? ', holiday' : '') + (hasNote ? ', has a note' : '');
       cells.push(
@@ -597,10 +690,12 @@
   function renderNotePanel() {
     var d = parseKey(selectedKey);
     document.getElementById('cal-note-date').textContent =
-      formatLong(d) + (isWorkDay(d) ? ' · Work day' : '');
+      formatLong(d) + (effectiveIsWorkDay(d) ? ' · Work day' : '');
     document.getElementById('cal-note-input').value = notes[selectedKey] || '';
     document.getElementById('cal-note-delete').hidden = !notes[selectedKey];
     document.getElementById('cal-note-holiday').checked = !!holidays[selectedKey];
+    document.getElementById('cal-note-workday').checked = effectiveIsWorkDay(d);
+    document.getElementById('cal-note-workday-reset').hidden = !workOverrides.hasOwnProperty(selectedKey);
   }
 
   function renderFooter() {
@@ -671,6 +766,18 @@
     render();
   });
 
+  document.getElementById('cal-note-workday').addEventListener('change', function (e) {
+    workOverrides[selectedKey] = e.target.checked;
+    saveWorkOverrides();
+    render();
+  });
+
+  document.getElementById('cal-note-workday-reset').addEventListener('click', function () {
+    delete workOverrides[selectedKey];
+    saveWorkOverrides();
+    render();
+  });
+
   document.getElementById('cal-range-form').addEventListener('submit', function (e) {
     e.preventDefault();
     var startInput = document.getElementById('cal-range-start');
@@ -699,6 +806,66 @@
     selectedKey = dateKey(start);
     goToMonth(start.getFullYear(), start.getMonth());
     e.target.reset();
+  });
+
+  function asObject(v) {
+    return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+  }
+
+  document.getElementById('cal-export-btn').addEventListener('click', function () {
+    var payload = { notes: notes, holidays: holidays, workOverrides: workOverrides };
+    var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'hive-calendar-backup-' + dateKey(today) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    document.getElementById('cal-data-status').textContent = 'Backup downloaded.';
+  });
+
+  document.getElementById('cal-import-input').addEventListener('change', function (e) {
+    var file = e.target.files[0];
+    var statusEl = document.getElementById('cal-data-status');
+    if (!file) return;
+
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var data = JSON.parse(reader.result);
+        var importedNotes = asObject(data.notes);
+        var importedHolidays = asObject(data.holidays);
+        var importedOverrides = asObject(data.workOverrides);
+        var noteCount = Object.keys(importedNotes).length;
+        var holidayCount = Object.keys(importedHolidays).length;
+        var overrideCount = Object.keys(importedOverrides).length;
+
+        if (!noteCount && !holidayCount && !overrideCount) {
+          statusEl.textContent = "That file didn't contain any calendar data.";
+          return;
+        }
+
+        // Merge rather than replace, so importing a backup never wipes out
+        // data already saved on this device -- only adds to or overwrites
+        // matching days.
+        Object.assign(notes, importedNotes);
+        Object.assign(holidays, importedHolidays);
+        Object.assign(workOverrides, importedOverrides);
+        saveNotes();
+        saveHolidays();
+        saveWorkOverrides();
+        render();
+        statusEl.textContent = 'Imported ' + noteCount + ' note' + (noteCount === 1 ? '' : 's') +
+          ', ' + holidayCount + ' holiday' + (holidayCount === 1 ? '' : 's') +
+          ', ' + overrideCount + ' work override' + (overrideCount === 1 ? '' : 's') + '.';
+      } catch (err) {
+        statusEl.textContent = "Couldn't read that file — is it a Hive Calendar backup?";
+      }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
   });
 
   render();
