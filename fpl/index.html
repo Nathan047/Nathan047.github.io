@@ -703,12 +703,12 @@
     return squad.filter(function (p) { return p.club === club; }).length;
   }
 
-  function inSquad(name) {
-    return squad.some(function (p) { return p.name === name; });
+  function inSquad(id) {
+    return squad.some(function (p) { return p.id === id; });
   }
 
   function canAdd(player) {
-    if (inSquad(player.name)) return { ok: false, reason: 'Already in your squad.' };
+    if (inSquad(player.id)) return { ok: false, reason: 'Already in your squad.' };
     var posSlots = POSITIONS.filter(function (g) { return g.key === player.position; })[0].slots;
     if (countByPosition(player.position) >= posSlots) {
       return { ok: false, reason: 'You already have ' + posSlots + ' ' + player.position.toLowerCase() + 's.' };
@@ -731,8 +731,8 @@
     renderAll();
   }
 
-  function removePlayer(name) {
-    squad = squad.filter(function (p) { return p.name !== name; });
+  function removePlayer(id) {
+    squad = squad.filter(function (p) { return p.id !== id; });
     importedBudget = null;
     saveSquad();
     renderAll();
@@ -772,10 +772,10 @@
         var p = players[i];
         if (p) {
           rows.push(
-            '<li class="slot">' +
+            '<li class="slot" data-id="' + escapeHtml(p.id) + '">' +
               '<span class="slot-name">' + escapeHtml(p.name) + ' <span class="slot-club">(' + escapeHtml(p.club) + ')</span></span>' +
               '<span class="slot-price">' + money(p.price) + '</span>' +
-              '<button type="button" class="slot-remove" data-remove="' + escapeHtml(p.name) + '" aria-label="Remove ' + escapeHtml(p.name) + '">×</button>' +
+              '<button type="button" class="slot-remove" data-remove="' + escapeHtml(p.id) + '" aria-label="Remove ' + escapeHtml(p.name) + '">×</button>' +
             '</li>'
           );
         } else {
@@ -792,7 +792,7 @@
 
     container.querySelectorAll('[data-remove]').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        removePlayer(btn.getAttribute('data-remove'));
+        removePlayer(parseInt(btn.getAttribute('data-remove'), 10));
       });
     });
   }
@@ -828,7 +828,7 @@
       container.innerHTML = '<div class="slot empty" style="justify-content:center;">No players match your search.</div>';
     } else {
       container.innerHTML = shown.map(function (p) {
-        var added = inSquad(p.name);
+        var added = inSquad(p.id);
         return (
           '<div class="player-row">' +
             '<div class="player-name-block">' +
@@ -838,7 +838,7 @@
             '<div class="player-col-stats"><span class="stat-mini-label">Price</span>' + money(p.price) + '</div>' +
             '<div class="player-col-stats"><span class="stat-mini-label">Points</span>' + p.points + '</div>' +
             '<span class="status-pill ' + statusClass(p.status) + '">' + escapeHtml(p.availability || p.status) + '</span>' +
-            '<button type="button" class="add-btn' + (added ? ' added' : '') + '" data-name="' + escapeHtml(p.name) + '">' + (added ? 'Remove' : 'Add') + '</button>' +
+            '<button type="button" class="add-btn' + (added ? ' added' : '') + '" data-id="' + escapeHtml(p.id) + '">' + (added ? 'Remove' : 'Add') + '</button>' +
           '</div>'
         );
       }).join('');
@@ -846,11 +846,11 @@
 
     container.querySelectorAll('.add-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        var name = btn.getAttribute('data-name');
-        var player = allPlayers.filter(function (p) { return p.name === name; })[0];
+        var id = parseInt(btn.getAttribute('data-id'), 10);
+        var player = allPlayers.filter(function (p) { return p.id === id; })[0];
         if (!player) return;
-        if (inSquad(name)) {
-          removePlayer(name);
+        if (inSquad(id)) {
+          removePlayer(id);
         } else {
           addPlayer(player);
         }
@@ -917,6 +917,10 @@
             return fetch(WORKER_BASE + '/entry/' + teamId + '/event/' + currentEvent.id + '/picks/')
               .then(function (r) { if (!r.ok) throw new Error('picks'); return r.json(); })
               .then(function (picksData) {
+                if (squad.length && !confirm('Importing will replace your current squad. Continue?')) {
+                  return;
+                }
+
                 var matched = [];
                 var unmatched = [];
 
