@@ -102,6 +102,11 @@
       name: 'Calendar', status: 'Shipped', label: '03', href: '/calendar/',
       body: "A month at a glance — click a day to leave yourself a note.",
       tags: ['HTML', 'JavaScript']
+    },
+    {
+      name: 'Expense Tracker', status: 'Shipped', label: '04', href: '/expense-tracker/',
+      body: "Every pound accounted for — log a purchase in two taps and see exactly where it went.",
+      tags: ['HTML', 'JavaScript']
     }
   ];
 
