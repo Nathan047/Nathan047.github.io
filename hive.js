@@ -309,6 +309,16 @@
       // #all-projects hash and reopen the interior all over again, even
       // though the user is looking at, and asked to reload, the exterior.
       history.replaceState(null, '', location.pathname + location.search);
+      // This entry (the sub-app's own page) is followed immediately by this
+      // one (the hive, hash already stripped above) with nothing in between
+      // -- there was never a separate "exterior" entry, since the interior
+      // was opened straight from a fresh page load, not a click on this same
+      // page. Without this pushState, pressing Back would skip straight past
+      // the exterior entirely and leave the site, back to the sub-app. This
+      // marks a distinct entry for "interior" on top of the (now hash-less)
+      // "exterior" one below it, so Back steps through them one at a time,
+      // same as the click-triggered path below (see enterHive()).
+      history.pushState({ hiveInside: true }, '', location.pathname + location.search);
     }
 
     // The scroll itself still waits for full load: the browser's native
@@ -445,11 +455,22 @@
 
   function enterHive() {
     if (mode !== 'landing' || isMobile()) return;
+    // Push a distinct history entry for "interior" on top of this one (the
+    // exterior). Without this, entering the interior leaves no trace in
+    // history at all, so pressing Back would skip past the exterior view
+    // entirely and leave the site/page outright instead of just backing out
+    // of the interior first.
+    history.pushState({ hiveInside: true }, '', location.pathname + location.search);
     crossfadeTo(true);
   }
   function exitHive() {
     if (mode !== 'inside') return;
-    crossfadeTo(false);
+    // Go back to the entry enterHive() (or the hash-triggered open above)
+    // pushed for "exterior", rather than applying the change directly --
+    // the popstate listener below is what actually performs it, so a click
+    // on this button and an actual Back-button press stay in sync with each
+    // other and with the browser's own history stack.
+    history.back();
   }
 
   landing.addEventListener('click', enterHive);
@@ -460,6 +481,20 @@
     }
   });
   backBtn.addEventListener('click', exitHive);
+
+  // Mirror browser Back/Forward to the landing/interior toggle. Whichever
+  // entry the user has navigated to (via the actual Back/Forward buttons, a
+  // mouse "back" button, or an Escape/on-page-button exit routed through
+  // exitHive()'s history.back() above) carries a hiveInside flag in its
+  // state; bring the visible mode in line with it. If the two already
+  // agree -- e.g. this fired for an unrelated history change elsewhere on
+  // the page -- there's nothing to do.
+  window.addEventListener('popstate', function (event) {
+    var wantInside = !!(event.state && event.state.hiveInside);
+    if (wantInside === (mode === 'inside')) return;
+    if (!wantInside && modalOpen) closeModal();
+    crossfadeTo(wantInside);
+  });
 
   // On mobile, enterHive() is a no-op (see above), so #hive-landing is a
   // dead control -- it must stop presenting itself as an actionable button
@@ -493,10 +528,17 @@
     if (isMobile()) {
       // A project modal may be open when this fires -- close it first (this
       // also restores focus to whatever triggered it, e.g. a hex cell) so
-      // exitHive()'s own focus handling below has a sane starting point
-      // instead of leaving the modal orphaned behind the landing view.
+      // the focus handling below has a sane starting point instead of
+      // leaving the modal orphaned behind the landing view.
       if (modalOpen) closeModal();
-      exitHive();
+      // crossfadeTo(), not exitHive(): this is an automatic reaction to a
+      // resize/rotation, not a user pressing Back, so it shouldn't consume
+      // the pushed history entry the way exitHive()'s history.back() does.
+      // The popstate listener already tolerates the resulting mismatch (mode
+      // says landing, the still-current entry says hiveInside) -- it's a
+      // no-op the next time Back is actually pressed, since by then mode
+      // already matches what leaving that entry would show.
+      crossfadeTo(false);
     } else {
       cellEls.forEach(function (el) { el.tabIndex = 0; });
     }
