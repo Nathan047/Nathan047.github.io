@@ -97,6 +97,17 @@
     font-size: 0.78rem;
     color: var(--ink-faint);
   }
+
+  footer a {
+    color: var(--ink-faint);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  footer a:hover,
+  footer a:focus-visible {
+    color: var(--accent);
+  }
 </style>
 </head>
 <body>
@@ -111,6 +122,7 @@
   <div class="hive-scene" id="hive-scene">
     <div class="hive-landing" id="hive-landing" role="button" tabindex="0" aria-label="Click to open the hive and browse projects on the honeycomb wall inside">
       <img src="hive.png" alt="An illustrated beehive with bees flying around it">
+      <p class="hive-landing-hint">Click to look inside →</p>
     </div>
     <div class="hive-interior" id="hive-interior" aria-hidden="true"></div>
     <button type="button" class="hive-back" id="hive-back" tabindex="-1">← Back to the hive</button>
@@ -163,7 +175,7 @@
   </section>
 
   <footer>
-    Maintained with Claude Code · last updated Sep 2026
+    Nathan Cook · <a href="https://github.com/Nathan047">GitHub</a> · Maintained with Claude Code · last updated Sep 2026
   </footer>
 </div>
 

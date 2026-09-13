@@ -175,8 +175,10 @@ html.hive-pending-interior .hive-interior { opacity: 1; pointer-events: auto; }
   /* #hive-landing is made non-interactive on mobile in hive.js
      (syncLandingInteractivity) since enterHive() no-ops below this width;
      drop the pointer cursor so it doesn't visually imply a dead click
-     target either. */
+     target either. Same reasoning for the "click to look inside" hint --
+     showing it here would advertise an interaction that doesn't exist. */
   .hive-landing { cursor: default; }
+  .hive-landing-hint { display: none; }
 }
 
 .hive-live-region {
@@ -213,6 +215,27 @@ html.hive-pending-interior .hive-interior { opacity: 1; pointer-events: auto; }
 .hive-landing:focus-visible {
   outline: 3px solid var(--ink);
   outline-offset: -4px;
+}
+
+/* Persistent (not hover-only) affordance that the illustration is a click
+   target -- unlike .hive-hint/.hive-back inside the interior, this has no
+   .visible toggle: it's shown by default any time #hive-landing itself is
+   (i.e. exactly when clicking it does something), and disappears with it
+   the moment the interior opens, since it's a child of #hive-landing rather
+   than a sibling. Hidden on mobile below, where clicking does nothing. */
+.hive-landing-hint {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  z-index: 3;
+  margin: 0;
+  padding: 6px 10px;
+  background: rgba(7, 10, 16, 0.90);
+  border-radius: 6px;
+  color: var(--ink);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  pointer-events: none;
 }
 
 .hive-fade {
