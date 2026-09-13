@@ -227,10 +227,20 @@ html.hive-pending-interior .hive-interior { opacity: 1; pointer-events: auto; }
 
 .hive-fade.active { opacity: 1; }
 
-/* ---------- static project list (first-class, zero-JS) ---------- */
+/* ---------- static project list (first-class, zero-JS on mobile) ---------- */
 
 .all-projects {
   margin-top: 2rem;
+}
+
+@media (min-width: 641px) {
+  /* Desktop already has the interactive honeycomb interior as its way to
+     browse (see hive.js) -- this static list stays mobile-only now, where
+     the honeycomb is disabled and this is the only way to browse. Elements
+     stay in the DOM (just visually hidden) so validateHiveData() in hive.js
+     can still catch drift between PROJECTS and this list, and so the
+     hash-triggered back-link flow is unaffected. */
+  .all-projects, .hive-alt-hint { display: none; }
 }
 
 .all-projects h2 {
