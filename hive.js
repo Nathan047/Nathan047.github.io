@@ -1,4 +1,13 @@
 (function () {
+  // Hand off from the pre-paint flash-prevention class (added by the inline
+  // script in index.html's <head>, before hive.js even started downloading)
+  // to the real state management below, which is now here to own it for
+  // real. This must not linger past this point -- left in place, it would
+  // force the interior visible/landing hidden forever via CSS, even once
+  // the user exits back to the exterior later (applyMode(false) only ever
+  // touches the .visible class and inline styles, not this class).
+  document.documentElement.classList.remove('hive-pending-interior');
+
   var landing = document.getElementById('hive-landing');
   var interior = document.getElementById('hive-interior');
   var hiveScene = document.getElementById('hive-scene');

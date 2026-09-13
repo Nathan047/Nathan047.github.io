@@ -51,6 +51,14 @@
 
 .hive-interior.visible { opacity: 1; pointer-events: auto; }
 
+/* Pre-paint flash prevention for the hash-triggered instant-open path (see
+   the inline script in index.html's <head>, and its cleanup in hive.js).
+   Forces the swapped state to already be there at the very first paint,
+   before hive.js has even finished downloading, so the exterior is never
+   shown at all while arriving via the "All projects" back-link on desktop. */
+html.hive-pending-interior .hive-landing { display: none; }
+html.hive-pending-interior .hive-interior { opacity: 1; pointer-events: auto; }
+
 /* Tiled hex-outline wall behind the comb, so even a couple of projects
    still reads as a honeycomb wall rather than floating in empty space. */
 .hive-wall {

@@ -4,6 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Hive</title>
+<script>
+  // Prevent a flash of the exterior hive when arriving via the sub-apps'
+  // "All projects" back-link (#all-projects) on desktop. hive.js -- which
+  // normally owns the landing/interior state -- loads with `defer`, so on a
+  // real (non-instant) network the browser can paint the default
+  // exterior-visible state before hive.js has even finished downloading.
+  // This runs synchronously, before anything below is parsed or painted, so
+  // the exterior is never shown at all. hive.js removes this class the
+  // moment it runs and takes over for real (mode, ARIA, focus, clearing the
+  // hash) -- see the matching html.hive-pending-interior rules in hive.css.
+  if (location.hash === '#all-projects' && window.matchMedia && window.matchMedia('(min-width: 641px)').matches) {
+    document.documentElement.classList.add('hive-pending-interior');
+  }
+</script>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="hive.css">
