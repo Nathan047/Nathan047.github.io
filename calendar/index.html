@@ -287,23 +287,6 @@
   #cal-note-input::placeholder { color: var(--ink-faint); }
   #cal-note-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-  .cal-note-row button {
-    flex: none;
-    padding: 0.6rem 1.05rem;
-    background: var(--accent);
-    color: var(--on-accent);
-    border: none;
-    border-radius: 6px;
-    font-family: "IBM Plex Sans", sans-serif;
-    font-weight: 600;
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: filter 0.15s ease;
-  }
-
-  .cal-note-row button:hover { filter: brightness(1.08); }
-  .cal-note-row button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-
   .cal-note-delete {
     background: none;
     border: none;
@@ -493,10 +476,9 @@
 
   <div class="cal-note-panel">
     <div class="cal-note-date" id="cal-note-date"></div>
-    <form class="cal-note-row" id="cal-note-form" autocomplete="off">
-      <input type="text" id="cal-note-input" placeholder="Add a note for this day…">
-      <button type="submit">Save</button>
-    </form>
+    <div class="cal-note-row">
+      <input type="text" id="cal-note-input" placeholder="Add a note for this day…" autocomplete="off">
+    </div>
     <div class="cal-note-extra">
       <div class="cal-note-toggles">
         <label class="cal-holiday-toggle cal-workday-toggle">
@@ -653,6 +635,21 @@
   var viewMonth = today.getMonth();
   var selectedKey = dateKey(today);
 
+  function buildDayCellHTML(key, day, isToday, isSelected) {
+    var hasNote = !!(notes[key] && notes[key].trim());
+    var isHoliday = !!holidays[key];
+    var isWork = effectiveIsWorkDay(parseKey(key));
+    var label = MONTH_NAMES[parseKey(key).getMonth()] + ' ' + day +
+      (isWork ? ', work day' : '') + (isHoliday ? ', holiday' : '') + (hasNote ? ', has a note' : '');
+    return '<button type="button" class="cal-day' + (isToday ? ' is-today' : '') + (isSelected ? ' is-selected' : '') +
+      '" data-key="' + key + '" aria-label="' + label + '" aria-pressed="' + isSelected + '">' +
+        (isWork ? '<span class="cal-day-work-dot" aria-hidden="true"></span>' : '') +
+        '<span class="cal-day-num">' + day + '</span>' +
+        (isHoliday ? '<span class="cal-day-holiday-dot" aria-hidden="true"></span>' : '') +
+        (hasNote ? '<span class="cal-day-dot" aria-hidden="true"></span>' : '') +
+      '</button>';
+  }
+
   function renderGrid() {
     var first = new Date(viewYear, viewMonth, 1);
     var startOffset = first.getDay();
@@ -665,26 +662,20 @@
     }
     for (var day = 1; day <= daysInMonth; day++) {
       var key = viewYear + '-' + pad(viewMonth + 1) + '-' + pad(day);
-      var isToday = key === todayKey;
-      var isSelected = key === selectedKey;
-      var hasNote = !!(notes[key] && notes[key].trim());
-      var isHoliday = !!holidays[key];
-      var isWork = effectiveIsWorkDay(new Date(viewYear, viewMonth, day));
-      var label = MONTH_NAMES[viewMonth] + ' ' + day +
-        (isWork ? ', work day' : '') + (isHoliday ? ', holiday' : '') + (hasNote ? ', has a note' : '');
-      cells.push(
-        '<button type="button" class="cal-day' + (isToday ? ' is-today' : '') + (isSelected ? ' is-selected' : '') +
-        '" data-key="' + key + '" aria-label="' + label + '" aria-pressed="' + isSelected + '">' +
-          (isWork ? '<span class="cal-day-work-dot" aria-hidden="true"></span>' : '') +
-          '<span class="cal-day-num">' + day + '</span>' +
-          (isHoliday ? '<span class="cal-day-holiday-dot" aria-hidden="true"></span>' : '') +
-          (hasNote ? '<span class="cal-day-dot" aria-hidden="true"></span>' : '') +
-        '</button>'
-      );
+      cells.push(buildDayCellHTML(key, day, key === todayKey, key === selectedKey));
     }
 
     document.getElementById('cal-grid-days').innerHTML = cells.join('');
     document.getElementById('cal-month-label').textContent = MONTH_NAMES[viewMonth] + ' ' + viewYear;
+  }
+
+  // Patches a single day cell in place (e.g. after autosaving a note),
+  // instead of rebuilding the whole grid and stealing focus/cursor
+  // position from the note input the user is still typing in.
+  function refreshDayCell(key) {
+    var btn = document.querySelector('.cal-day[data-key="' + key + '"]');
+    if (!btn) return;
+    btn.outerHTML = buildDayCellHTML(key, parseKey(key).getDate(), key === dateKey(today), key === selectedKey);
   }
 
   function renderNotePanel() {
@@ -737,20 +728,40 @@
     render();
   });
 
-  document.getElementById('cal-note-form').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var input = document.getElementById('cal-note-input');
-    var text = input.value.trim();
+  var noteSaveTimer = null;
+
+  function commitNoteInput() {
+    var text = document.getElementById('cal-note-input').value.trim();
     if (text) {
       notes[selectedKey] = text;
     } else {
       delete notes[selectedKey];
     }
     saveNotes();
-    render();
+    document.getElementById('cal-note-delete').hidden = !notes[selectedKey];
+    refreshDayCell(selectedKey);
+    renderFooter();
+  }
+
+  document.getElementById('cal-note-input').addEventListener('input', function () {
+    clearTimeout(noteSaveTimer);
+    noteSaveTimer = setTimeout(commitNoteInput, 400);
+  });
+
+  document.getElementById('cal-note-input').addEventListener('blur', function () {
+    clearTimeout(noteSaveTimer);
+    commitNoteInput();
+  });
+
+  // Flush a pending debounced save if the tab is closed/backgrounded
+  // mid-keystroke, so the last few characters typed are never lost.
+  window.addEventListener('pagehide', function () {
+    clearTimeout(noteSaveTimer);
+    commitNoteInput();
   });
 
   document.getElementById('cal-note-delete').addEventListener('click', function () {
+    clearTimeout(noteSaveTimer);
     delete notes[selectedKey];
     saveNotes();
     render();
