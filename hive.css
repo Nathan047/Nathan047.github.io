@@ -45,23 +45,10 @@
 .hive-interior {
   position: absolute;
   inset: 0;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s linear;
   background:
     radial-gradient(ellipse at 50% 38%, rgba(255, 201, 60, 0.16), transparent 60%),
     var(--hive-stage);
 }
-
-.hive-interior.visible { opacity: 1; pointer-events: auto; }
-
-/* Pre-paint flash prevention for the hash-triggered instant-open path (see
-   the inline script in index.html's <head>, and its cleanup in hive.js).
-   Forces the swapped state to already be there at the very first paint,
-   before hive.js has even finished downloading, so the exterior is never
-   shown at all while arriving via the "All projects" back-link on desktop. */
-html.hive-pending-interior .hive-landing { display: none; }
-html.hive-pending-interior .hive-interior { opacity: 1; pointer-events: auto; }
 
 /* Tiled hex-outline wall behind the comb, so even a couple of projects
    still reads as a honeycomb wall rather than floating in empty space. */
@@ -177,24 +164,6 @@ html.hive-pending-interior .hive-interior { opacity: 1; pointer-events: auto; }
   padding: 0 8%;
 }
 
-@media (max-width: 640px) {
-  /* Below this width the hive scene is decorative only (see isMobile()
-     in hive.js, which also stops "enter hive" from doing anything) -- the
-     static #all-projects list is the primary interface. The pointer-events
-     rule is a defensive backstop so cells can never be clicked even if JS
-     state gets out of sync with viewport size. */
-  .hive-hex { pointer-events: none; }
-  .hive-scene { height: 340px; }
-
-  /* #hive-landing is made non-interactive on mobile in hive.js
-     (syncLandingInteractivity) since enterHive() no-ops below this width;
-     drop the pointer cursor so it doesn't visually imply a dead click
-     target either. Same reasoning for the "click to look inside" hint --
-     showing it here would advertise an interaction that doesn't exist. */
-  .hive-landing { cursor: default; }
-  .hive-landing-hint { display: none; }
-}
-
 .hive-live-region {
   position: absolute;
   width: 1px;
@@ -204,14 +173,16 @@ html.hive-pending-interior .hive-interior { opacity: 1; pointer-events: auto; }
   white-space: nowrap;
 }
 
+/* Purely decorative now (mobile only -- see the max-width media query
+   below) -- there's no click-to-enter step any more, desktop lands
+   straight on the honeycomb interior. */
 .hive-landing {
   position: absolute;
   inset: 0;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   background: var(--sky);
-  cursor: pointer;
 }
 
 .hive-landing img {
@@ -226,43 +197,18 @@ html.hive-pending-interior .hive-interior { opacity: 1; pointer-events: auto; }
   display: block;
 }
 
-.hive-landing:focus-visible {
-  outline: 3px solid var(--ink);
-  outline-offset: -4px;
+@media (max-width: 640px) {
+  /* Below this width the honeycomb interior is hidden entirely and the
+     beehive illustration becomes a purely decorative hero image -- the
+     static #all-projects list further down the page is the only way to
+     browse projects here. Comes after the unconditional rules above so it
+     wins the cascade at matching specificity, rather than the other way
+     around. */
+  .hive-scene { height: 340px; }
+  .hive-landing { display: flex; }
+  .hive-interior { display: none; }
+  .hive-hint { display: none; }
 }
-
-/* Persistent (not hover-only) affordance that the illustration is a click
-   target -- unlike .hive-hint/.hive-back inside the interior, this has no
-   .visible toggle: it's shown by default any time #hive-landing itself is
-   (i.e. exactly when clicking it does something), and disappears with it
-   the moment the interior opens, since it's a child of #hive-landing rather
-   than a sibling. Hidden on mobile below, where clicking does nothing. */
-.hive-landing-hint {
-  position: absolute;
-  bottom: 14px;
-  left: 14px;
-  z-index: 3;
-  margin: 0;
-  padding: 6px 10px;
-  background: rgba(7, 10, 16, 0.90);
-  border-radius: 6px;
-  color: var(--ink);
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.72rem;
-  pointer-events: none;
-}
-
-.hive-fade {
-  position: absolute;
-  inset: 0;
-  z-index: 6;
-  background: var(--paper);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.28s linear;
-}
-
-.hive-fade.active { opacity: 1; }
 
 /* ---------- static project list (first-class, zero-JS on mobile) ---------- */
 
@@ -374,36 +320,9 @@ html.hive-pending-interior .hive-interior { opacity: 1; pointer-events: auto; }
   color: var(--ink-soft);
 }
 
-.hive-back {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  z-index: 3;
-  padding: 0.5rem 0.9rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  color: var(--ink-soft);
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.78rem;
-  cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-4px);
-  transition: opacity 0.25s ease, transform 0.25s ease, border-color 0.15s ease, color 0.15s ease;
-}
-
-.hive-back.visible {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
-}
-
-.hive-back:hover { border-color: var(--accent); color: var(--ink); }
-.hive-back:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
 /* Bottom-left instruction hint -- near-black scrim with the site's own
-   ink color on top, so it sits on the new Hive Signal palette. */
+   ink color on top, so it sits on the new Hive Signal palette. Always
+   visible now (desktop's honeycomb is no longer entered/exited). */
 .hive-hint {
   position: absolute;
   bottom: 14px;
@@ -416,12 +335,8 @@ html.hive-pending-interior .hive-interior { opacity: 1; pointer-events: auto; }
   color: var(--ink);
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.72rem;
-  opacity: 0;
   pointer-events: none;
-  transition: opacity 0.25s ease;
 }
-
-.hive-hint.visible { opacity: 1; }
 
 /* Bottom-right hover readout -- index + title, fades in on hover only.
    Colors/type: Archivo heading, the site's yellow accent for the index

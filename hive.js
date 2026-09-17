@@ -1,20 +1,7 @@
 (function () {
-  // Hand off from the pre-paint flash-prevention class (added by the inline
-  // script in index.html's <head>, before hive.js even started downloading)
-  // to the real state management below, which is now here to own it for
-  // real. This must not linger past this point -- left in place, it would
-  // force the interior visible/landing hidden forever via CSS, even once
-  // the user exits back to the exterior later (applyMode(false) only ever
-  // touches the .visible class and inline styles, not this class).
-  document.documentElement.classList.remove('hive-pending-interior');
-
-  var landing = document.getElementById('hive-landing');
   var interior = document.getElementById('hive-interior');
   var hiveScene = document.getElementById('hive-scene');
   var hiveAltHint = document.querySelector('.hive-alt-hint');
-  var backBtn = document.getElementById('hive-back');
-  var hintEl = document.getElementById('hive-hint');
-  var fadeEl = document.getElementById('hive-fade');
   var liveRegion = document.getElementById('hive-live');
   var readoutEl = document.getElementById('hive-readout');
   var readoutN = document.getElementById('hive-readout-n');
@@ -27,11 +14,13 @@
   var modalLink = document.getElementById('hive-modal-link');
   var modalClose = document.getElementById('hive-modal-close');
   var modalEl = modalBackdrop ? modalBackdrop.querySelector('.hive-modal') : null;
-  if (!landing || !interior) return;
+  if (!interior) return;
 
-  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Below 640px the honeycomb is hidden entirely via CSS (see hive.css) and
+  // the beehive illustration becomes a purely decorative hero image -- the
+  // static #all-projects list is the only way to browse there. Used below
+  // only to pick a scroll target and to close an orphaned modal on resize.
   var mobileQuery = window.matchMedia ? window.matchMedia('(max-width: 640px)') : null;
-  function isMobile() { return mobileQuery ? mobileQuery.matches : window.innerWidth <= 640; }
 
   // ---------- hex layout (ported verbatim from the reviewed
   // hive-comb-preview.html mockup) ----------
@@ -173,11 +162,6 @@
     return;
   }
 
-  // ---------- mode / fade transition ----------
-
-  var mode = 'landing'; // landing | inside
-  var FADE_MS = reduceMotion ? 0 : 280;
-
   // ---------- comb rendering ----------
 
   var cellEls = [];
@@ -213,7 +197,10 @@
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'hive-hex';
-      btn.tabIndex = -1; // synced to 0 by crossfadeTo()/syncMobileGating() when appropriate
+      // Always a tab stop -- on mobile the whole interior is display:none
+      // (see hive.css), which already removes it from the tab order with
+      // no extra gating needed here.
+      btn.tabIndex = 0;
       btn.setAttribute('aria-label', 'Open ' + project.name + ' project details');
 
       var rim = document.createElement('div');
@@ -286,70 +273,26 @@
   positionHiveComb();
 
   // Arriving with a #hash (e.g. the sub-apps' "All projects" back link).
+  // The honeycomb is always visible on desktop now -- there's no more
+  // click-to-enter step to time around -- so this only needs to pick a
+  // scroll target: the honeycomb itself on desktop, the static list
+  // further down the page on mobile (where the honeycomb is hidden).
   if (window.location.hash) {
     var hash = window.location.hash.slice(1);
-
-    // On desktop the honeycomb interior -- not the plain zero-JS list
-    // further down the page -- is the primary way to browse projects (see
-    // the mobile media query in hive.css), so a trip back from a project
-    // should reopen straight into it rather than land on the exterior hive.
-    // This has to happen right here, synchronously, rather than waiting for
-    // the page's `load` event below: on a real network (unlike the fast
-    // local dev server), hive.png and the web fonts can take a while to
-    // finish loading, and until this script changes it the DOM's default
-    // state is the exterior -- so waiting for `load` meant the user sat
-    // looking at the exterior for that whole stretch before it flipped to
-    // the interior. That wait was never actually necessary: .hive-scene has
-    // a fixed height and `overflow: hidden`, so hiding the (possibly still
-    // loading) exterior image inside it can't cause any layout shift.
-    // Mobile has no interior to open (enterHive()/applyMode(true) below is
-    // only reached off this branch), so it keeps landing on the static
-    // list, which is already its primary interface there.
-    var openedInteriorForHash = hash === 'all-projects' && !isMobile() && mode === 'landing';
-    if (openedInteriorForHash) {
-      // Show the interior directly, skipping crossfadeTo()'s fade -- that
-      // transition is for a visible click-triggered change of state; here
-      // the exterior was never actually seen, so fading from it would just
-      // show a flash of the wrong view before landing on the right one.
-      applyMode(true, true);
-      // Drop the hash once it's been acted on. Otherwise it just sits in
-      // the URL indefinitely -- so exiting back to the exterior (the back
-      // button) and then simply reloading the page (a hard refresh, or even
-      // just re-opening a tab restored from history) would see the same
-      // #all-projects hash and reopen the interior all over again, even
-      // though the user is looking at, and asked to reload, the exterior.
-      history.replaceState(null, '', location.pathname + location.search);
-      // This entry (the sub-app's own page) is followed immediately by this
-      // one (the hive, hash already stripped above) with nothing in between
-      // -- there was never a separate "exterior" entry, since the interior
-      // was opened straight from a fresh page load, not a click on this same
-      // page. Without this pushState, pressing Back would skip straight past
-      // the exterior entirely and leave the site, back to the sub-app. This
-      // marks a distinct entry for "interior" on top of the (now hash-less)
-      // "exterior" one below it, so Back steps through them one at a time,
-      // same as the click-triggered path below (see enterHive()).
-      history.pushState({ hiveInside: true }, '', location.pathname + location.search);
-    }
-
-    // The scroll itself still waits for full load: the browser's native
+    var landOnHash = function () {
+      var isDesktop = !mobileQuery || !mobileQuery.matches;
+      var target = (hash === 'all-projects' && isDesktop) ? hiveScene : document.getElementById(hash);
+      if (target) target.scrollIntoView();
+    };
+    // The scroll itself waits for full load: the browser's native
     // scroll-to-fragment fires before hive.png/web fonts have settled the
     // page's final layout, so it can land short of the target and never
     // re-corrects on its own. Re-run it once everything has actually
-    // settled.
-    var landOnHash = function () {
-      if (openedInteriorForHash) {
-        hiveScene.scrollIntoView();
-        return;
-      }
-      var target = document.getElementById(hash);
-      if (target) target.scrollIntoView();
-    };
-    // 'load' fires only once, so if the page is already cached from an
-    // earlier visit (the common case for this back-link, since the user was
-    // just on this same hive minutes ago) it can finish -- and 'load' can
-    // fire -- before this deferred script even starts running, in which case
-    // the listener below would never fire at all. Run immediately in that
-    // case instead of waiting on an event that has already happened.
+    // settled. 'load' fires only once, so if the page is already cached
+    // from an earlier visit it can finish -- and 'load' can fire -- before
+    // this deferred script even starts running, in which case the listener
+    // below would never fire at all. Run immediately in that case instead
+    // of waiting on an event that has already happened.
     if (document.readyState === 'complete') {
       landOnHash();
     } else {
@@ -358,23 +301,19 @@
   }
 
   // The comb's cell positions/sizes are computed in JS pixels (not a scaling
-  // SVG viewBox), so a viewport width change that doesn't cross the mobile
-  // breakpoint (e.g. resizing a desktop window) still needs a re-layout to
-  // keep the comb correctly scaled to the available stage area. Only the
-  // positioning phase runs here -- rebuilding the buttons on every resize
-  // would destroy element identity, dropping focus off a focused hex and
-  // breaking openModal()'s saved modalTriggerEl reference if a modal is
-  // open. Rapid resize events (e.g. a drag-resize) are coalesced to at most
-  // one reposition per animation frame via rAF de-duping.
+  // SVG viewBox), so any viewport width change needs a re-layout to keep the
+  // comb correctly scaled to the available stage area. Only the positioning
+  // phase runs here -- rebuilding the buttons on every resize would destroy
+  // element identity, dropping focus off a focused hex and breaking
+  // openModal()'s saved modalTriggerEl reference if a modal is open. Rapid
+  // resize events (e.g. a drag-resize) are coalesced to at most one
+  // reposition per animation frame via rAF de-duping.
   var resizeRaf = null;
   window.addEventListener('resize', function () {
     if (resizeRaf !== null) cancelAnimationFrame(resizeRaf);
     resizeRaf = requestAnimationFrame(function () {
       resizeRaf = null;
       positionHiveComb();
-      if (mode === 'inside') {
-        cellEls.forEach(function (el) { el.tabIndex = isMobile() ? -1 : 0; });
-      }
     });
   });
 
@@ -386,183 +325,6 @@
     } else {
       readoutEl.classList.remove('visible');
     }
-  }
-
-  function applyMode(showInside, instant) {
-    // .hive-interior/.hive-back/.hive-hint each have their own opacity (and,
-    // for the back button, transform) transition, normally invisible because
-    // crossfadeTo() only ever swaps them while the separate .hive-fade
-    // overlay is covering the screen. The instant hash-triggered open below
-    // has no such cover, so without this those transitions would still play
-    // on their own -- exactly the flash this is meant to avoid. Suppress
-    // them for one swap, then hand back to the stylesheet so the normal,
-    // overlay-covered crossfadeTo() path is unaffected.
-    var instantEls = instant ? [interior, backBtn, hintEl] : null;
-    if (instantEls) {
-      instantEls.forEach(function (el) { el.style.transition = 'none'; });
-    }
-    if (showInside) {
-      landing.style.display = 'none';
-      interior.classList.add('visible');
-      interior.setAttribute('aria-hidden', 'false');
-      cellEls.forEach(function (el) { el.tabIndex = isMobile() ? -1 : 0; });
-      backBtn.classList.add('visible');
-      backBtn.tabIndex = 0;
-      hintEl.classList.add('visible');
-      // Move focus into the interior BEFORE hiding the landing subtree from
-      // assistive tech -- aria-hidden must never be set on an ancestor of
-      // document.activeElement, even transiently.
-      backBtn.focus();
-      landing.setAttribute('aria-hidden', 'true');
-      mode = 'inside';
-      announce('Inside the hive. ' + PROJECTS.length + ' projects on the wall.');
-    } else {
-      landing.style.display = '';
-      landing.setAttribute('aria-hidden', 'false');
-      // Move focus back to the landing element BEFORE hiding the interior
-      // subtree (a hex cell may still hold focus here) -- same ordering
-      // requirement as the entering branch above, mirrored. But only steal
-      // focus at all if it's currently somewhere inside the hive scene
-      // (e.g. a hex cell or the back button) -- if the user has since
-      // moved focus elsewhere on the page (e.g. the static project list),
-      // e.g. because this exit was triggered by a resize crossing the
-      // mobile breakpoint out from under them, leave their focus alone.
-      if (hiveScene && hiveScene.contains(document.activeElement)) {
-        landing.focus();
-      }
-      interior.classList.remove('visible');
-      interior.setAttribute('aria-hidden', 'true');
-      cellEls.forEach(function (el) { el.tabIndex = -1; });
-      backBtn.classList.remove('visible');
-      backBtn.tabIndex = -1;
-      hintEl.classList.remove('visible');
-      mode = 'landing';
-      readoutEl.classList.remove('visible');
-      announce('Back at the hive.');
-    }
-    if (instantEls) {
-      // Force a reflow so the class/attribute changes above are committed
-      // with transitions off, before restoring them on the next frame --
-      // restoring on the same tick could still let the browser coalesce it
-      // with the change above into one (still-instant) style pass, but
-      // waiting a frame is the reliable way to guarantee that never happens.
-      void interior.offsetHeight;
-      requestAnimationFrame(function () {
-        instantEls.forEach(function (el) { el.style.transition = ''; });
-      });
-    }
-  }
-
-  function crossfadeTo(showInside) {
-    fadeEl.classList.add('active');
-    setTimeout(function () {
-      applyMode(showInside);
-      requestAnimationFrame(function () {
-        fadeEl.classList.remove('active');
-      });
-    }, FADE_MS);
-  }
-
-  function enterHive() {
-    if (mode !== 'landing' || isMobile()) return;
-    // Push a distinct history entry for "interior" on top of this one (the
-    // exterior). Without this, entering the interior leaves no trace in
-    // history at all, so pressing Back would skip past the exterior view
-    // entirely and leave the site/page outright instead of just backing out
-    // of the interior first.
-    history.pushState({ hiveInside: true }, '', location.pathname + location.search);
-    crossfadeTo(true);
-  }
-  function exitHive() {
-    if (mode !== 'inside') return;
-    // Go back to the entry enterHive() (or the hash-triggered open above)
-    // pushed for "exterior", rather than applying the change directly --
-    // the popstate listener below is what actually performs it, so a click
-    // on this button and an actual Back-button press stay in sync with each
-    // other and with the browser's own history stack.
-    history.back();
-  }
-
-  landing.addEventListener('click', enterHive);
-  landing.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
-      e.preventDefault();
-      enterHive();
-    }
-  });
-  backBtn.addEventListener('click', exitHive);
-
-  // Mirror browser Back/Forward to the landing/interior toggle. Whichever
-  // entry the user has navigated to (via the actual Back/Forward buttons, a
-  // mouse "back" button, or an Escape/on-page-button exit routed through
-  // exitHive()'s history.back() above) carries a hiveInside flag in its
-  // state; bring the visible mode in line with it. If the two already
-  // agree -- e.g. this fired for an unrelated history change elsewhere on
-  // the page -- there's nothing to do.
-  window.addEventListener('popstate', function (event) {
-    var wantInside = !!(event.state && event.state.hiveInside);
-    if (wantInside === (mode === 'inside')) return;
-    if (!wantInside && modalOpen) closeModal();
-    crossfadeTo(wantInside);
-  });
-
-  // On mobile, enterHive() is a no-op (see above), so #hive-landing is a
-  // dead control -- it must stop presenting itself as an actionable button
-  // to assistive tech and keyboard users. Desktop keeps the original
-  // role/tabindex/label so the interactive affordance is unchanged there.
-  var LANDING_LABEL_DESKTOP = 'Click to open the hive and browse projects on the honeycomb wall inside';
-  var LANDING_LABEL_MOBILE = 'An illustrated beehive';
-  function syncLandingInteractivity() {
-    if (isMobile()) {
-      landing.setAttribute('tabindex', '-1');
-      landing.removeAttribute('role');
-      landing.setAttribute('aria-label', LANDING_LABEL_MOBILE);
-    } else {
-      landing.setAttribute('tabindex', '0');
-      landing.setAttribute('role', 'button');
-      landing.setAttribute('aria-label', LANDING_LABEL_DESKTOP);
-    }
-  }
-  syncLandingInteractivity();
-
-  // Re-sync mobile gating live: isMobile()/tabIndex above is only applied at
-  // hive-entry time in crossfadeTo(), so a resize/rotation crossing the
-  // 640px breakpoint while already inside would otherwise leave hex cells
-  // keyboard-focusable (and openModal() has no gating of its own). Rather
-  // than duplicating the isMobile() check inside openModal(), the simpler
-  // and more robust fix is to treat "became mobile while inside" the same
-  // as pressing Escape/Back: exit back to the landing view, which already
-  // resets every cell's tabIndex to -1 and restores focus safely.
-  function syncMobileGating() {
-    if (mode !== 'inside') return;
-    if (isMobile()) {
-      // A project modal may be open when this fires -- close it first (this
-      // also restores focus to whatever triggered it, e.g. a hex cell) so
-      // the focus handling below has a sane starting point instead of
-      // leaving the modal orphaned behind the landing view.
-      if (modalOpen) closeModal();
-      // crossfadeTo(), not exitHive(): this is an automatic reaction to a
-      // resize/rotation, not a user pressing Back, so it shouldn't consume
-      // the pushed history entry the way exitHive()'s history.back() does.
-      // The popstate listener already tolerates the resulting mismatch (mode
-      // says landing, the still-current entry says hiveInside) -- it's a
-      // no-op the next time Back is actually pressed, since by then mode
-      // already matches what leaving that entry would show.
-      crossfadeTo(false);
-    } else {
-      cellEls.forEach(function (el) { el.tabIndex = 0; });
-    }
-  }
-  function handleViewportChange() {
-    syncLandingInteractivity();
-    syncMobileGating();
-  }
-  if (mobileQuery && mobileQuery.addEventListener) {
-    mobileQuery.addEventListener('change', handleViewportChange);
-  } else if (mobileQuery && mobileQuery.addListener) {
-    mobileQuery.addListener(handleViewportChange); // Safari <14 fallback
-  } else {
-    window.addEventListener('resize', handleViewportChange);
   }
 
   // ---------- project modal ----------
@@ -643,8 +405,24 @@
       trapModalTab(e);
       return;
     }
-    if (e.key !== 'Escape') return;
-    if (modalOpen) { e.preventDefault(); closeModal(); }
-    else if (mode === 'inside') { e.preventDefault(); exitHive(); }
+    if (e.key === 'Escape' && modalOpen) {
+      e.preventDefault();
+      closeModal();
+    }
   });
+
+  // If the window is resized/rotated down past the mobile breakpoint while
+  // a project modal is open, the honeycomb behind it disappears entirely
+  // (display: none, see hive.css) -- close the now-orphaned modal along
+  // with it rather than leaving it floating with nothing sensible behind it.
+  if (mobileQuery) {
+    var handleMobileChange = function (e) {
+      if (e.matches && modalOpen) closeModal();
+    };
+    if (mobileQuery.addEventListener) {
+      mobileQuery.addEventListener('change', handleMobileChange);
+    } else if (mobileQuery.addListener) {
+      mobileQuery.addListener(handleMobileChange); // Safari <14 fallback
+    }
+  }
 })();
