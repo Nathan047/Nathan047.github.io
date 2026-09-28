@@ -1,0 +1,1250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jarvis</title>
+<meta name="description" content="A voice assistant for my phone that can run my to-do list, calendar and expenses.">
+<meta name="theme-color" content="#070A10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Jarvis">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --paper: #070A10;
+    --surface: #101B33;
+    --surface-2: #17284A;
+    --ink: #F1F5FB;
+    --ink-soft: #A9BEDE;
+    --ink-faint: #869CC0;
+    --line: #26406E;
+    --accent: #FFC93C;
+    --accent-2: #4D8DFF;
+    --on-accent: #070A10;
+    --bad: #F2796B;
+  }
+
+  * { box-sizing: border-box; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+
+  html, body { margin: 0; padding: 0; height: 100%; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    line-height: 1.55;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .app {
+    display: flex;
+    flex-direction: column;
+    max-width: 560px;
+    height: 100%;
+    height: 100dvh;
+    margin: 0 auto;
+    padding: env(safe-area-inset-top) 1rem env(safe-area-inset-bottom);
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.9rem 0 0.6rem;
+  }
+
+  .back-link {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .back-link:hover { text-decoration: underline; }
+  .back-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  h1 {
+    margin: 0;
+    font-family: "Fraunces", Georgia, serif;
+    font-optical-sizing: auto;
+    font-weight: 700;
+    font-size: 1.6rem;
+    letter-spacing: 0.02em;
+  }
+
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+
+  .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .icon-btn svg { width: 20px; height: 20px; }
+
+  .topbar-actions { display: flex; gap: 0.5rem; }
+
+  /* ---------- transcript ---------- */
+
+  .transcript {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.5rem 0 1rem;
+    overscroll-behavior: contain;
+  }
+
+  .msg {
+    max-width: 88%;
+    padding: 0.65rem 0.9rem;
+    border-radius: 14px;
+    font-size: 0.97rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .msg-user {
+    align-self: flex-end;
+    background: var(--accent);
+    color: var(--on-accent);
+    border-bottom-right-radius: 4px;
+  }
+
+  .msg-jarvis {
+    align-self: flex-start;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-bottom-left-radius: 4px;
+  }
+
+  .msg-note {
+    align-self: center;
+    max-width: 100%;
+    padding: 0.2rem 0.6rem;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+    text-align: center;
+  }
+
+  .msg-error {
+    align-self: stretch;
+    max-width: 100%;
+    background: #2A1210;
+    border: 1px solid var(--bad);
+    color: var(--ink);
+    font-size: 0.9rem;
+  }
+
+  .welcome {
+    margin: auto 0;
+    padding: 1rem 0.25rem;
+    text-align: center;
+    color: var(--ink-soft);
+  }
+
+  .welcome p { margin: 0 0 0.9rem; }
+
+  .suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .suggestion {
+    padding: 0.45rem 0.8rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+
+  .suggestion:hover { border-color: var(--accent); }
+  .suggestion:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- dock: orb + text input ---------- */
+
+  .dock {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0 1rem;
+    border-top: 1px solid var(--line);
+  }
+
+  .status {
+    min-height: 1.3em;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    color: var(--ink-faint);
+    text-align: center;
+  }
+
+  .orb {
+    position: relative;
+    width: 92px;
+    height: 92px;
+    margin-top: 0.4rem;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 45%, #FFF3C4 0%, var(--accent) 32%, #C98A00 62%, #3A2A05 100%);
+    box-shadow: 0 0 22px rgba(255, 201, 60, 0.35), inset 0 0 12px rgba(0, 0, 0, 0.45);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.2s ease;
+  }
+
+  .orb:active { transform: scale(0.96); }
+  .orb:focus-visible { outline: 3px solid var(--ink); outline-offset: 4px; }
+
+  .orb::before,
+  .orb::after {
+    content: "";
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 201, 60, 0.35);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .orb svg {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 34px;
+    height: 34px;
+    color: var(--on-accent);
+  }
+
+  body[data-state="listening"] .orb {
+    box-shadow: 0 0 36px rgba(255, 201, 60, 0.7), inset 0 0 12px rgba(0, 0, 0, 0.35);
+  }
+
+  body[data-state="listening"] .orb::before,
+  body[data-state="listening"] .orb::after {
+    animation: ripple 1.6s ease-out infinite;
+  }
+
+  body[data-state="listening"] .orb::after { animation-delay: 0.8s; }
+
+  body[data-state="thinking"] .orb {
+    background: radial-gradient(circle at 50% 45%, #D6E6FF 0%, var(--accent-2) 36%, #1B3E86 70%, #0A1630 100%);
+    box-shadow: 0 0 30px rgba(77, 141, 255, 0.55), inset 0 0 12px rgba(0, 0, 0, 0.45);
+    animation: breathe 1.2s ease-in-out infinite;
+  }
+
+  body[data-state="thinking"] .orb svg { color: #0A1630; }
+
+  body[data-state="speaking"] .orb {
+    animation: breathe 0.7s ease-in-out infinite;
+  }
+
+  @keyframes ripple {
+    0% { transform: scale(0.9); opacity: 0.9; }
+    100% { transform: scale(1.5); opacity: 0; }
+  }
+
+  @keyframes breathe {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+  }
+
+  .text-form {
+    display: flex;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .text-form input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.65rem 0.85rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 16px; /* 16px stops iOS zooming the page on focus */
+  }
+
+  .text-form input::placeholder { color: var(--ink-faint); }
+  .text-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .send-btn {
+    flex: none;
+    padding: 0 1.1rem;
+    background: var(--accent);
+    color: var(--on-accent);
+    border: none;
+    border-radius: 999px;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+
+  .send-btn:disabled { opacity: 0.5; cursor: default; }
+  .send-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+  /* ---------- settings sheet ---------- */
+
+  dialog.settings {
+    width: min(520px, calc(100% - 2rem));
+    max-height: calc(100dvh - 2rem);
+    padding: 1.4rem 1.25rem 1.25rem;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+  }
+
+  dialog.settings::backdrop { background: rgba(3, 5, 10, 0.75); }
+
+  .settings h2 {
+    margin: 0 0 0.35rem;
+    font-family: "Fraunces", Georgia, serif;
+    font-size: 1.35rem;
+  }
+
+  .settings .lede {
+    margin: 0 0 1.1rem;
+    color: var(--ink-soft);
+    font-size: 0.88rem;
+  }
+
+  .settings a { color: var(--accent); }
+
+  .field { margin-bottom: 1rem; }
+
+  .field label,
+  .field .label {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .field input[type="text"],
+  .field input[type="password"],
+  .field input[type="url"],
+  .field select {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 16px;
+  }
+
+  .field input:focus-visible,
+  .field select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .field .hint {
+    margin: 0.3rem 0 0;
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+  }
+
+  .check {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 0.9rem;
+  }
+
+  .check input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+  details.advanced {
+    margin: 0.25rem 0 1rem;
+    font-size: 0.88rem;
+  }
+
+  details.advanced summary {
+    cursor: pointer;
+    color: var(--ink-soft);
+    margin-bottom: 0.75rem;
+  }
+
+  .settings-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+  }
+
+  .btn {
+    padding: 0.6rem 1.1rem;
+    border-radius: 8px;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 0.92rem;
+    cursor: pointer;
+  }
+
+  .btn-primary { background: var(--accent); color: var(--on-accent); border: none; }
+  .btn-ghost { background: none; color: var(--ink-soft); border: 1px solid var(--line); }
+  .btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body data-state="idle">
+<div class="app">
+  <header class="topbar">
+    <a class="back-link" href="/#all-projects">← Hive</a>
+    <h1>Jarvis</h1>
+    <div class="topbar-actions">
+      <button type="button" class="icon-btn" id="new-chat-btn" aria-label="Start a new conversation">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+      <button type="button" class="icon-btn" id="settings-btn" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="transcript" id="transcript" aria-live="polite"></main>
+
+  <div class="dock">
+    <button type="button" class="orb" id="orb" aria-label="Talk to Jarvis">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+    </button>
+    <div class="status" id="status">Tap to talk</div>
+    <form class="text-form" id="text-form" autocomplete="off">
+      <label class="visually-hidden" for="text-input">Message Jarvis</label>
+      <input type="text" id="text-input" placeholder="Or type a message…" enterkeyhint="send">
+      <button type="submit" class="send-btn" id="send-btn">Send</button>
+    </form>
+  </div>
+</div>
+
+<dialog class="settings" id="settings" aria-labelledby="settings-title">
+  <form method="dialog" id="settings-form">
+    <h2 id="settings-title">Settings</h2>
+    <p class="lede">Jarvis runs on Claude. Paste an API key from the <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Anthropic Console</a>. It's stored only on this device, and only ever sent to Anthropic.</p>
+
+    <div class="field">
+      <label for="set-key" id="set-key-label">Anthropic API key</label>
+      <input type="password" id="set-key" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+    </div>
+
+    <div class="field">
+      <label for="set-name">What should Jarvis call you?</label>
+      <input type="text" id="set-name" placeholder="sir">
+    </div>
+
+    <div class="field">
+      <label for="set-model">Model</label>
+      <select id="set-model">
+        <option value="claude-opus-5">Claude Opus 5 (smartest)</option>
+        <option value="claude-sonnet-5">Claude Sonnet 5 (faster, cheaper)</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label class="check"><input type="checkbox" id="set-speak"> Read replies out loud</label>
+    </div>
+
+    <div class="field">
+      <label for="set-voice">Voice</label>
+      <select id="set-voice"></select>
+    </div>
+
+    <details class="advanced">
+      <summary>Advanced: use a proxy instead</summary>
+      <div class="field">
+        <label for="set-proxy">Proxy URL</label>
+        <input type="url" id="set-proxy" placeholder="https://jarvis.your-name.workers.dev" autocomplete="off" spellcheck="false">
+        <p class="hint">Optional. If you deploy jarvis/worker.js to Cloudflare, your real key lives there instead of on the phone; put the worker URL here and your passphrase in the key box above.</p>
+      </div>
+    </details>
+
+    <div class="settings-actions">
+      <button type="button" class="btn btn-ghost" id="settings-cancel">Cancel</button>
+      <button type="submit" class="btn btn-primary" id="settings-save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module">
+  import Anthropic from 'https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.128.0/+esm';
+
+  // ---------- settings ----------
+
+  var SETTINGS_KEY = 'jarvis-settings';
+  var CONVO_KEY = 'jarvis-conversation';
+  var DEFAULT_SETTINGS = { apiKey: '', name: '', model: 'claude-opus-5', speak: true, voice: '', proxyUrl: '' };
+
+  // A conversation is resumed if you come back to it within this window;
+  // after that Jarvis starts fresh rather than dragging old context along.
+  var CONVO_IDLE_MS = 6 * 60 * 60 * 1000;
+  // Hard caps on one conversation. History is never trimmed from the front
+  // (that would rewrite earlier turns the model already saw), so a long
+  // conversation just rolls over into a new one instead.
+  var CONVO_MAX_TURNS = 40;
+  var CONVO_MAX_BYTES = 1500000;
+
+  function loadJSON(key, fallback) {
+    try {
+      var raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (e) {
+      return fallback;
+    }
+  }
+
+  function saveJSON(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  var settings = Object.assign({}, DEFAULT_SETTINGS, loadJSON(SETTINGS_KEY, {}));
+
+  // ---------- shared Hive data (same keys/shapes as the other apps) ----------
+  //
+  // Jarvis is served from the same origin as the To-Do List, Calendar and
+  // Expense Tracker, so it can read and write their localStorage directly.
+  // The keys and record shapes below must stay in sync with those apps.
+
+  var TODO_KEY = 'hive-todo-tasks';
+  var TODO_DEFAULTS = [ // mirrors DEFAULT_TASKS in to-do-list/index.html
+    { id: 't2', text: 'Make a daily inspirational quote generator' },
+    { id: 't4', text: 'Create an app' }
+  ];
+  var EXPENSES_KEY = 'hive-expenses';
+  var EXPENSE_CATEGORIES = ['Food & Drink', 'Transport', 'Bills & Utilities', 'Shopping', 'Entertainment', 'Health', 'Other'];
+  var CAL_NOTES_KEY = 'hive-calendar-notes';
+  var CAL_HOLIDAYS_KEY = 'hive-calendar-holidays';
+  var CAL_OVERRIDES_KEY = 'hive-calendar-work-overrides';
+  var CAL_ROTA_KEY = 'hive-calendar-rota';
+  var CAL_DEFAULT_ROTA = { // mirrors DEFAULT_ROTA in calendar/index.html
+    anchorMonday: '2026-09-14',
+    weekA: [3, 4, 5, 6, 0],
+    weekB: [2, 3, 4]
+  };
+  var WEEKDAY_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function dateKey(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function parseKey(key) {
+    var parts = key.split('-');
+    return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  }
+  function isValidDateKey(s) {
+    if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+    var d = parseKey(s);
+    return !isNaN(d.getTime()) && dateKey(d) === s;
+  }
+  function newId(prefix) { return prefix + Date.now() + Math.random().toString(36).slice(2, 7); }
+
+  function loadRota() {
+    var r = loadJSON(CAL_ROTA_KEY, null);
+    if (r && typeof r.anchorMonday === 'string' && Array.isArray(r.weekA) && Array.isArray(r.weekB)) return r;
+    return CAL_DEFAULT_ROTA;
+  }
+
+  function utcDayCount(d) { return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000); }
+  function mondayOf(d) {
+    var day = d.getDay();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() + (day === 0 ? -6 : 1 - day));
+  }
+  function isWorkDay(d, rota, overrides) { // same rules as effectiveIsWorkDay() in the Calendar
+    var key = dateKey(d);
+    if (Object.prototype.hasOwnProperty.call(overrides, key)) return !!overrides[key];
+    var anchor = mondayOf(parseKey(rota.anchorMonday));
+    var weeksSince = Math.floor((utcDayCount(mondayOf(d)) - utcDayCount(anchor)) / 7);
+    var pattern = (((weeksSince % 2) + 2) % 2) === 0 ? rota.weekA : rota.weekB;
+    return pattern.indexOf(d.getDay()) !== -1;
+  }
+
+  function checkRange(start, end, maxDays) {
+    if (!isValidDateKey(start) || !isValidDateKey(end)) throw new Error('Dates must be YYYY-MM-DD.');
+    var span = utcDayCount(parseKey(end)) - utcDayCount(parseKey(start));
+    if (span < 0) throw new Error('end_date is before start_date.');
+    if (span > maxDays) throw new Error('Range too long; ask for at most ' + maxDays + ' days at a time.');
+  }
+
+  // ---------- tools ----------
+
+  var TOOL_IMPL = {
+    list_todos: function () {
+      return { tasks: loadJSON(TODO_KEY, TODO_DEFAULTS) };
+    },
+
+    add_todo: function (input) {
+      var text = typeof input.text === 'string' ? input.text.trim() : '';
+      if (!text) throw new Error('text is required.');
+      var tasks = loadJSON(TODO_KEY, TODO_DEFAULTS);
+      var task = { id: newId('t'), text: text };
+      tasks.push(task);
+      if (!saveJSON(TODO_KEY, tasks)) throw new Error('Could not save to this device.');
+      return { added: task, total: tasks.length };
+    },
+
+    complete_todo: function (input) {
+      var tasks = loadJSON(TODO_KEY, TODO_DEFAULTS);
+      var match = tasks.filter(function (t) { return t.id === input.id; })[0];
+      if (!match) throw new Error('No task with id ' + input.id + '. Call list_todos to get current ids.');
+      tasks = tasks.filter(function (t) { return t.id !== input.id; });
+      if (!saveJSON(TODO_KEY, tasks)) throw new Error('Could not save to this device.');
+      return { completed: match, remaining: tasks.length };
+    },
+
+    get_calendar: function (input) {
+      checkRange(input.start_date, input.end_date, 62);
+      var notes = loadJSON(CAL_NOTES_KEY, {});
+      var holidays = loadJSON(CAL_HOLIDAYS_KEY, {});
+      var overrides = loadJSON(CAL_OVERRIDES_KEY, {});
+      var rota = loadRota();
+      var days = [];
+      for (var d = parseKey(input.start_date); dateKey(d) <= input.end_date; d.setDate(d.getDate() + 1)) {
+        var key = dateKey(d);
+        var day = { date: key, weekday: WEEKDAY_LONG[d.getDay()], work_day: isWorkDay(d, rota, overrides) };
+        if (holidays[key]) day.holiday = true;
+        if (notes[key] && notes[key].trim()) day.note = notes[key];
+        days.push(day);
+      }
+      return { days: days };
+    },
+
+    set_calendar_note: function (input) {
+      if (!isValidDateKey(input.date)) throw new Error('date must be YYYY-MM-DD.');
+      var text = typeof input.note === 'string' ? input.note.trim() : '';
+      var notes = loadJSON(CAL_NOTES_KEY, {});
+      var existing = notes[input.date] ? notes[input.date].trim() : '';
+      var next = input.mode === 'replace' ? text : (existing && text ? existing + '\n' + text : existing || text);
+      if (next) notes[input.date] = next; else delete notes[input.date];
+      if (!saveJSON(CAL_NOTES_KEY, notes)) throw new Error('Could not save to this device.');
+      return { date: input.date, note: next || null };
+    },
+
+    add_expense: function (input) {
+      var amount = Number(input.amount);
+      if (!isFinite(amount) || amount <= 0) throw new Error('amount must be a positive number of pounds.');
+      var category = EXPENSE_CATEGORIES.indexOf(input.category) !== -1 ? input.category : 'Other';
+      var date = input.date ? input.date : dateKey(new Date());
+      if (!isValidDateKey(date)) throw new Error('date must be YYYY-MM-DD.');
+      var entry = {
+        id: newId('x'),
+        date: date,
+        category: category,
+        note: typeof input.note === 'string' ? input.note.trim() : '',
+        amount: Math.round(amount * 100) / 100
+      };
+      var list = loadJSON(EXPENSES_KEY, []);
+      if (!Array.isArray(list)) list = [];
+      list.push(entry);
+      if (!saveJSON(EXPENSES_KEY, list)) throw new Error('Could not save to this device.');
+      return { added: entry };
+    },
+
+    get_expenses: function (input) {
+      checkRange(input.start_date, input.end_date, 400);
+      var list = loadJSON(EXPENSES_KEY, []);
+      if (!Array.isArray(list)) list = [];
+      var inRange = list.filter(function (e) { return e.date >= input.start_date && e.date <= input.end_date; });
+      var byCategory = {};
+      var total = 0;
+      inRange.forEach(function (e) {
+        total += e.amount;
+        byCategory[e.category] = Math.round(((byCategory[e.category] || 0) + e.amount) * 100) / 100;
+      });
+      inRange.sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+      return {
+        currency: 'GBP',
+        total: Math.round(total * 100) / 100,
+        count: inRange.length,
+        by_category: byCategory,
+        items: inRange.slice(0, 50) // most recent first
+      };
+    }
+  };
+
+  var DATE_RANGE_SCHEMA = {
+    type: 'object',
+    properties: {
+      start_date: { type: 'string', description: 'First day, YYYY-MM-DD.' },
+      end_date: { type: 'string', description: 'Last day (inclusive), YYYY-MM-DD.' }
+    },
+    required: ['start_date', 'end_date']
+  };
+
+  var TOOLS = [
+    {
+      name: 'list_todos',
+      description: "List the tasks on the user's To-Do List. Each has an id and text.",
+      input_schema: { type: 'object', properties: {} }
+    },
+    {
+      name: 'add_todo',
+      description: "Add a task to the user's To-Do List.",
+      input_schema: {
+        type: 'object',
+        properties: { text: { type: 'string', description: 'The task, written as a short imperative, e.g. "Buy milk".' } },
+        required: ['text']
+      }
+    },
+    {
+      name: 'complete_todo',
+      description: "Tick off (remove) a task from the To-Do List by id. Call list_todos first if you don't have the id.",
+      input_schema: {
+        type: 'object',
+        properties: { id: { type: 'string' } },
+        required: ['id']
+      }
+    },
+    {
+      name: 'get_calendar',
+      description: "Read the user's calendar for a date range (max 62 days): for each day, whether it's a work day on their shift rota, whether it's a holiday, and any note they left.",
+      input_schema: DATE_RANGE_SCHEMA
+    },
+    {
+      name: 'set_calendar_note',
+      description: 'Write a note on a calendar day. Appends to any existing note by default; use mode "replace" to overwrite, or replace with an empty note to clear it.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          date: { type: 'string', description: 'YYYY-MM-DD.' },
+          note: { type: 'string' },
+          mode: { type: 'string', enum: ['append', 'replace'] }
+        },
+        required: ['date', 'note']
+      }
+    },
+    {
+      name: 'add_expense',
+      description: "Log a purchase in the user's Expense Tracker. Amounts are in pounds sterling.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          amount: { type: 'number', description: 'Amount in GBP, e.g. 4.5.' },
+          category: { type: 'string', enum: EXPENSE_CATEGORIES },
+          note: { type: 'string', description: 'What it was for, e.g. "Coffee".' },
+          date: { type: 'string', description: 'YYYY-MM-DD. Defaults to today.' }
+        },
+        required: ['amount', 'category']
+      }
+    },
+    {
+      name: 'get_expenses',
+      description: "Summarise the user's logged expenses in a date range: total, per-category totals and the most recent items.",
+      input_schema: DATE_RANGE_SCHEMA
+    },
+    {
+      type: 'web_search_20260209',
+      name: 'web_search',
+      max_uses: 3,
+      user_location: {
+        type: 'approximate',
+        country: 'GB',
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London'
+      }
+    }
+  ];
+
+  function runTool(name, input) {
+    var impl = TOOL_IMPL[name];
+    if (!impl) return { content: 'Unknown tool: ' + name, is_error: true };
+    try {
+      return { content: JSON.stringify(impl(input && typeof input === 'object' ? input : {})) };
+    } catch (e) {
+      return { content: e.message || String(e), is_error: true };
+    }
+  }
+
+  // ---------- system prompt ----------
+
+  var PERSONA = [
+    'You are Jarvis, a personal assistant living on the user\'s phone, in the spirit of Tony Stark\'s J.A.R.V.I.S.:',
+    'calm, capable, quietly witty and unfailingly polite, with a British turn of phrase.',
+    '',
+    'Your replies are usually read aloud by text-to-speech, so write for the ear:',
+    '- Plain sentences only. No markdown, bullet symbols, headings, tables, emoji or URLs.',
+    '- Keep it brief: one to three sentences unless the user asks for detail.',
+    '- Say numbers and dates the way a person would ("four pounds fifty", "Friday the third").',
+    '',
+    'You can manage the user\'s own apps through tools: their To-Do List, their Calendar (which also knows their work shift rota and holidays),',
+    'and their Expense Tracker (in pounds). Use them whenever the request touches that data, and confirm what you changed in a few words.',
+    'Use web search for anything current, such as weather, news, sport, opening times or prices.',
+    'If a request is ambiguous in a way that matters (which day, how much), ask one short question instead of guessing.'
+  ].join('\n');
+
+  function contextBlock() {
+    var now = new Date();
+    var who = settings.name ? 'Address the user as "' + settings.name + '".' : 'Address the user as "sir".';
+    return 'Current local date and time: ' + WEEKDAY_LONG[now.getDay()] + ' ' + dateKey(now) + ' ' +
+      pad(now.getHours()) + ':' + pad(now.getMinutes()) + ' (' + (Intl.DateTimeFormat().resolvedOptions().timeZone || 'local time') + '). ' + who;
+  }
+
+  // ---------- conversation state ----------
+
+  var convo = loadJSON(CONVO_KEY, null);
+  if (!convo || !Array.isArray(convo.messages) || Date.now() - (convo.lastActive || 0) > CONVO_IDLE_MS) {
+    convo = { messages: [], lastActive: Date.now() };
+  }
+
+  function persistConvo() {
+    convo.lastActive = Date.now();
+    if (!saveJSON(CONVO_KEY, convo)) {
+      // Storage full (web search results can be bulky) -- keep going in memory.
+      try { localStorage.removeItem(CONVO_KEY); } catch (e) {}
+    }
+  }
+
+  function userTurnCount() {
+    return convo.messages.filter(function (m) { return m.role === 'user' && typeof m.content === 'string'; }).length;
+  }
+
+  function resetConvo(note) {
+    convo = { messages: [], lastActive: Date.now() };
+    persistConvo();
+    renderTranscript();
+    if (note) addBubble('note', note);
+  }
+
+  // ---------- rendering ----------
+
+  var transcriptEl = document.getElementById('transcript');
+  var statusEl = document.getElementById('status');
+  var textInput = document.getElementById('text-input');
+  var sendBtn = document.getElementById('send-btn');
+
+  function textOf(content) {
+    if (typeof content === 'string') return content;
+    return content.filter(function (b) { return b.type === 'text'; })
+      .map(function (b) { return b.text; }).join('').trim();
+  }
+
+  function addBubble(kind, text) {
+    var welcome = document.getElementById('welcome');
+    if (welcome) welcome.remove();
+    var div = document.createElement('div');
+    div.className = 'msg msg-' + kind;
+    div.textContent = text;
+    transcriptEl.appendChild(div);
+    transcriptEl.scrollTop = transcriptEl.scrollHeight;
+    return div;
+  }
+
+  var SUGGESTIONS = [
+    "What's on my to-do list?",
+    'Am I working this weekend?',
+    'Log £4.50 on coffee',
+    "What's the weather today?"
+  ];
+
+  function renderTranscript() {
+    transcriptEl.innerHTML = '';
+    var shown = 0;
+    convo.messages.forEach(function (m) {
+      // Only the human-readable ends of each exchange: the user's own words
+      // and assistant turns that actually said something (not tool plumbing).
+      if (m.role === 'user' && typeof m.content === 'string') { addBubble('user', m.content); shown++; }
+      if (m.role === 'assistant') {
+        var t = textOf(m.content);
+        var isToolTurn = Array.isArray(m.content) && m.content.some(function (b) { return b.type === 'tool_use'; });
+        if (t && !isToolTurn) { addBubble('jarvis', t); shown++; }
+      }
+    });
+    if (!shown) {
+      var w = document.createElement('div');
+      w.className = 'welcome';
+      w.id = 'welcome';
+      var p = document.createElement('p');
+      p.textContent = settings.apiKey
+        ? 'Good ' + partOfDay() + (settings.name ? ', ' + settings.name : '') + '. How can I help?'
+        : 'Welcome. Open Settings (the gear, top right) and add your Anthropic API key to wake me up.';
+      w.appendChild(p);
+      var s = document.createElement('div');
+      s.className = 'suggestions';
+      SUGGESTIONS.forEach(function (text) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'suggestion';
+        b.textContent = text;
+        b.addEventListener('click', function () { send(text); });
+        s.appendChild(b);
+      });
+      w.appendChild(s);
+      transcriptEl.appendChild(w);
+    }
+  }
+
+  function partOfDay() {
+    var h = new Date().getHours();
+    return h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening';
+  }
+
+  var IDLE_STATUS = 'Tap to talk';
+
+  function setState(state, status) {
+    document.body.dataset.state = state;
+    statusEl.textContent = status || (state === 'idle' ? IDLE_STATUS : '');
+    sendBtn.disabled = state === 'thinking';
+  }
+
+  // ---------- speech out ----------
+
+  var synth = window.speechSynthesis || null;
+
+  function pickVoice() {
+    if (!synth) return null;
+    var voices = synth.getVoices();
+    if (settings.voice) {
+      var chosen = voices.filter(function (v) { return v.voiceURI === settings.voice; })[0];
+      if (chosen) return chosen;
+    }
+    var gb = voices.filter(function (v) { return /^en[-_]GB/i.test(v.lang); });
+    var male = gb.filter(function (v) { return /daniel|arthur|george|male|oliver|ryan/i.test(v.name); });
+    return male[0] || gb[0] || voices.filter(function (v) { return /^en/i.test(v.lang); })[0] || null;
+  }
+
+  function speak(text) {
+    if (!synth || !settings.speak || !text) return;
+    synth.cancel();
+    var u = new SpeechSynthesisUtterance(text);
+    var v = pickVoice();
+    if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = 'en-GB'; }
+    u.rate = 1.03;
+    u.onstart = function () { setState('speaking', 'Speaking — tap to interrupt'); };
+    u.onend = u.onerror = function () { if (document.body.dataset.state === 'speaking') setState('idle'); };
+    synth.speak(u);
+  }
+
+  function stopSpeaking() {
+    if (synth && (synth.speaking || synth.pending)) synth.cancel();
+  }
+
+  // iOS only lets speech start from inside a user gesture. Speaking an empty
+  // utterance on the first tap "unlocks" it for the later async reply.
+  var speechUnlocked = false;
+  function unlockSpeech() {
+    if (speechUnlocked || !synth) return;
+    speechUnlocked = true;
+    try { synth.speak(new SpeechSynthesisUtterance('')); } catch (e) {}
+  }
+
+  // ---------- speech in ----------
+
+  var Recognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  var recognizer = null;
+  var listening = false;
+
+  function startListening() {
+    if (!Recognition) {
+      addBubble('note', "This browser can't do speech recognition — type instead, or try Chrome on Android / Safari on iPhone.");
+      textInput.focus();
+      return;
+    }
+    recognizer = new Recognition();
+    recognizer.lang = navigator.language || 'en-GB';
+    recognizer.interimResults = true;
+    recognizer.continuous = false;
+    recognizer.maxAlternatives = 1;
+
+    var finalText = '';
+    recognizer.onresult = function (e) {
+      var interim = '';
+      for (var i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
+        else interim += e.results[i][0].transcript;
+      }
+      statusEl.textContent = (finalText + interim).trim() || 'Listening…';
+    };
+    recognizer.onerror = function (e) {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+        addBubble('note', 'Microphone access was blocked. Allow it in your browser settings, or type instead.');
+      }
+    };
+    recognizer.onend = function () {
+      listening = false;
+      recognizer = null;
+      var text = finalText.trim();
+      if (text) send(text);
+      else if (document.body.dataset.state === 'listening') setState('idle');
+    };
+
+    listening = true;
+    setState('listening', 'Listening…');
+    try {
+      recognizer.start();
+    } catch (e) {
+      listening = false;
+      setState('idle');
+    }
+  }
+
+  function stopListening() {
+    if (recognizer) recognizer.stop(); // onend sends whatever was heard
+  }
+
+  // ---------- talking to Claude ----------
+
+  var MAX_LOOP_ITERATIONS = 10;
+  var busy = false;
+
+  function makeClient() {
+    var opts = { apiKey: settings.apiKey, dangerouslyAllowBrowser: true, maxRetries: 2 };
+    if (settings.proxyUrl) opts.baseURL = settings.proxyUrl.replace(/\/+$/, '');
+    return new Anthropic(opts);
+  }
+
+  function createMessage(client) {
+    var params = {
+      model: settings.model,
+      max_tokens: 16000,
+      system: [
+        { type: 'text', text: PERSONA, cache_control: { type: 'ephemeral' } },
+        { type: 'text', text: contextBlock() }
+      ],
+      tools: TOOLS,
+      messages: convo.messages,
+      output_config: { effort: 'medium' }
+    };
+    if (settings.model === 'claude-opus-5') {
+      // If a safety classifier declines, retry server-side on a suitable model
+      // rather than handing back an empty refusal.
+      params.betas = ['server-side-fallback-2026-07-01'];
+      params.fallbacks = 'default';
+      return client.beta.messages.create(params);
+    }
+    return client.messages.create(params);
+  }
+
+  function describeError(err) {
+    if (err instanceof Anthropic.AuthenticationError) return settings.proxyUrl
+      ? "The proxy rejected the passphrase. Check it in Settings."
+      : "That API key didn't work. Check it in Settings.";
+    if (err instanceof Anthropic.PermissionDeniedError) return "This API key isn't allowed to use that model.";
+    if (err instanceof Anthropic.RateLimitError) return "I'm being rate limited. Give it a moment and try again.";
+    if (err instanceof Anthropic.BadRequestError) {
+      var msg = (err.error && err.error.error && err.error.error.message) || err.message;
+      if (/credit balance/i.test(msg)) return 'Your Anthropic account is out of credit. Top up in the Console.';
+      return 'Request rejected: ' + msg;
+    }
+    if (err instanceof Anthropic.APIConnectionError) return "I can't reach the server. Check your connection.";
+    if (err instanceof Anthropic.APIError) return 'Server error (' + (err.status || '?') + '). Try again shortly.';
+    return 'Something went wrong: ' + (err && err.message ? err.message : String(err));
+  }
+
+  async function send(text) {
+    text = (text || '').trim();
+    if (!text || busy) return;
+    if (!settings.apiKey) {
+      openSettings();
+      return;
+    }
+    stopSpeaking();
+
+    if (userTurnCount() >= CONVO_MAX_TURNS || JSON.stringify(convo.messages).length > CONVO_MAX_BYTES) {
+      resetConvo('That conversation got long, so I started a fresh one.');
+    }
+
+    busy = true;
+    var checkpoint = convo.messages.length;
+    addBubble('user', text);
+    convo.messages.push({ role: 'user', content: text });
+    setState('thinking', 'Thinking…');
+
+    var reply = '';
+    try {
+      var client = makeClient();
+      for (var i = 0; i < MAX_LOOP_ITERATIONS; i++) {
+        var response = await createMessage(client);
+        convo.messages.push({ role: 'assistant', content: response.content });
+
+        if (response.stop_reason === 'pause_turn') continue; // long web search; let it carry on
+
+        if (response.stop_reason === 'refusal') {
+          reply = textOf(response.content) || "I'm afraid I can't help with that one.";
+          break;
+        }
+
+        var toolUses = response.content.filter(function (b) { return b.type === 'tool_use'; });
+        if (response.stop_reason !== 'tool_use' || !toolUses.length) {
+          reply = textOf(response.content);
+          if (response.stop_reason === 'max_tokens') reply += (reply ? ' ' : '') + '(I ran out of room there.)';
+          break;
+        }
+
+        statusEl.textContent = toolUses.map(toolLabel).join(' · ');
+        var results = toolUses.map(function (t) {
+          var r = runTool(t.name, t.input);
+          return { type: 'tool_result', tool_use_id: t.id, content: r.content, is_error: !!r.is_error };
+        });
+        // All results for one assistant turn go back in a single user message.
+        convo.messages.push({ role: 'user', content: results });
+      }
+
+      if (!reply) reply = 'Done.';
+      persistConvo();
+      addBubble('jarvis', reply);
+      setState('idle');
+      speak(reply);
+    } catch (err) {
+      // Roll back this exchange so a failed request never leaves a dangling
+      // tool_use or unanswered user turn in the saved history.
+      convo.messages.length = checkpoint;
+      persistConvo();
+      addBubble('error', describeError(err));
+      setState('idle');
+    } finally {
+      busy = false;
+    }
+  }
+
+  function toolLabel(t) {
+    return {
+      list_todos: 'Checking your to-do list…',
+      add_todo: 'Adding to your to-do list…',
+      complete_todo: 'Ticking that off…',
+      get_calendar: 'Checking your calendar…',
+      set_calendar_note: 'Updating your calendar…',
+      add_expense: 'Logging the expense…',
+      get_expenses: 'Checking your spending…'
+    }[t.name] || 'Working…';
+  }
+
+  // ---------- wiring ----------
+
+  document.getElementById('orb').addEventListener('click', function () {
+    unlockSpeech();
+    var state = document.body.dataset.state;
+    if (state === 'speaking') { stopSpeaking(); setState('idle'); return; }
+    if (state === 'thinking') return;
+    if (listening) { stopListening(); return; }
+    startListening();
+  });
+
+  document.getElementById('text-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    unlockSpeech();
+    var text = textInput.value;
+    textInput.value = '';
+    send(text);
+  });
+
+  document.getElementById('new-chat-btn').addEventListener('click', function () {
+    if (busy) return;
+    stopSpeaking();
+    resetConvo();
+  });
+
+  // ---------- settings dialog ----------
+
+  var dialog = document.getElementById('settings');
+  var fKey = document.getElementById('set-key');
+  var fKeyLabel = document.getElementById('set-key-label');
+  var fName = document.getElementById('set-name');
+  var fModel = document.getElementById('set-model');
+  var fSpeak = document.getElementById('set-speak');
+  var fVoice = document.getElementById('set-voice');
+  var fProxy = document.getElementById('set-proxy');
+
+  function fillVoices() {
+    var voices = synth ? synth.getVoices().filter(function (v) { return /^en/i.test(v.lang); }) : [];
+    fVoice.innerHTML = '';
+    var auto = document.createElement('option');
+    auto.value = '';
+    auto.textContent = 'Automatic (British English)';
+    fVoice.appendChild(auto);
+    voices.forEach(function (v) {
+      var o = document.createElement('option');
+      o.value = v.voiceURI;
+      o.textContent = v.name + ' (' + v.lang + ')';
+      fVoice.appendChild(o);
+    });
+    fVoice.value = settings.voice;
+    if (fVoice.value !== settings.voice) fVoice.value = '';
+  }
+  if (synth && 'onvoiceschanged' in synth) synth.addEventListener('voiceschanged', fillVoices);
+
+  function syncKeyLabel() {
+    fKeyLabel.textContent = fProxy.value.trim() ? 'Proxy passphrase' : 'Anthropic API key';
+    fKey.placeholder = fProxy.value.trim() ? 'Your worker passphrase' : 'sk-ant-…';
+  }
+  fProxy.addEventListener('input', syncKeyLabel);
+
+  function openSettings() {
+    fKey.value = settings.apiKey;
+    fName.value = settings.name;
+    fModel.value = settings.model;
+    fSpeak.checked = !!settings.speak;
+    fProxy.value = settings.proxyUrl;
+    if (settings.proxyUrl) dialog.querySelector('details').open = true;
+    fillVoices();
+    syncKeyLabel();
+    dialog.showModal();
+  }
+
+  document.getElementById('settings-btn').addEventListener('click', openSettings);
+  document.getElementById('settings-cancel').addEventListener('click', function () { dialog.close(); });
+
+  document.getElementById('settings-form').addEventListener('submit', function () {
+    settings.apiKey = fKey.value.trim();
+    settings.name = fName.value.trim();
+    settings.model = fModel.value;
+    settings.speak = fSpeak.checked;
+    settings.voice = fVoice.value;
+    settings.proxyUrl = fProxy.value.trim();
+    if (!saveJSON(SETTINGS_KEY, settings)) {
+      addBubble('error', "Couldn't save settings on this device (private browsing?). They'll last until you close the page.");
+    }
+    if (!busy) renderTranscript();
+  });
+
+  // ---------- boot ----------
+
+  renderTranscript();
+  setState('idle', Recognition ? IDLE_STATUS : 'Voice input not supported here — type below');
+  if (!settings.apiKey) openSettings();
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  }
+</script>
+</body>
+</html>
