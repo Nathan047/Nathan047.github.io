@@ -98,7 +98,7 @@
       tags: ['HTML', 'JavaScript']
     },
     {
-      name: 'Jarvis', status: 'Shipped', label: '05', href: '/jarvis/',
+      name: 'Knox', status: 'Shipped', label: '05', href: '/knox/',
       body: "My own voice assistant for my phone — talk to it and it runs my to-do list, calendar and expenses, and searches the web.",
       tags: ['HTML', 'JavaScript', 'Claude API']
     }

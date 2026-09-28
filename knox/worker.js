@@ -1,4 +1,4 @@
-// Cloudflare Worker (optional): relays Jarvis's requests to the Claude API
+// Cloudflare Worker (optional): relays Knox's requests to the Claude API
 // so the real Anthropic API key never has to be stored on the phone. Not
 // part of the GitHub Pages build -- kept here for reference and version
 // history, like fpl/worker.js.
@@ -7,8 +7,8 @@
 //   1. Paste this file in as the worker's code and deploy.
 //   2. Settings > Variables and Secrets, add two *secrets*:
 //        ANTHROPIC_API_KEY  -- your real sk-ant-... key
-//        JARVIS_PASSPHRASE  -- any long random string you make up
-//   3. In Jarvis > Settings > Advanced, set the proxy URL to the worker's
+//        KNOX_PASSPHRASE  -- any long random string you make up
+//   3. In Knox > Settings > Advanced, set the proxy URL to the worker's
 //      URL, and put the passphrase in the key box.
 //
 // The browser sends the passphrase where an API key would go (x-api-key);
@@ -55,7 +55,7 @@ export default {
       return json(request, 404, { type: "error", error: { type: "not_found_error", message: "Not found" } });
     }
 
-    if (!env.JARVIS_PASSPHRASE || request.headers.get("x-api-key") !== env.JARVIS_PASSPHRASE) {
+    if (!env.KNOX_PASSPHRASE || request.headers.get("x-api-key") !== env.KNOX_PASSPHRASE) {
       return json(request, 401, { type: "error", error: { type: "authentication_error", message: "Bad passphrase" } });
     }
 

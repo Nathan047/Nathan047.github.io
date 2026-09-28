@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Jarvis</title>
+<title>Knox</title>
 <meta name="description" content="A voice assistant for my phone that can run my to-do list, calendar and expenses.">
 <meta name="theme-color" content="#070A10">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Jarvis">
+<meta name="apple-mobile-web-app-title" content="Knox">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -134,7 +134,7 @@
     border-bottom-right-radius: 4px;
   }
 
-  .msg-jarvis {
+  .msg-knox {
     align-self: flex-start;
     background: var(--surface);
     border: 1px solid var(--line);
@@ -431,7 +431,7 @@
 <div class="app">
   <header class="topbar">
     <a class="back-link" href="/#all-projects">← Hive</a>
-    <h1>Jarvis</h1>
+    <h1>Knox</h1>
     <div class="topbar-actions">
       <button type="button" class="icon-btn" id="new-chat-btn" aria-label="Start a new conversation">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
@@ -445,12 +445,12 @@
   <main class="transcript" id="transcript" aria-live="polite"></main>
 
   <div class="dock">
-    <button type="button" class="orb" id="orb" aria-label="Talk to Jarvis">
+    <button type="button" class="orb" id="orb" aria-label="Talk to Knox">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
     </button>
     <div class="status" id="status">Tap to talk</div>
     <form class="text-form" id="text-form" autocomplete="off">
-      <label class="visually-hidden" for="text-input">Message Jarvis</label>
+      <label class="visually-hidden" for="text-input">Message Knox</label>
       <input type="text" id="text-input" placeholder="Or type a message…" enterkeyhint="send">
       <button type="submit" class="send-btn" id="send-btn">Send</button>
     </form>
@@ -460,7 +460,7 @@
 <dialog class="settings" id="settings" aria-labelledby="settings-title">
   <form method="dialog" id="settings-form">
     <h2 id="settings-title">Settings</h2>
-    <p class="lede">Jarvis runs on Claude. Paste an API key from the <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Anthropic Console</a>. It's stored only on this device, and only ever sent to Anthropic.</p>
+    <p class="lede">Knox runs on Claude. Paste an API key from the <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Anthropic Console</a>. It's stored only on this device, and only ever sent to Anthropic.</p>
 
     <div class="field">
       <label for="set-key" id="set-key-label">Anthropic API key</label>
@@ -468,7 +468,7 @@
     </div>
 
     <div class="field">
-      <label for="set-name">What should Jarvis call you?</label>
+      <label for="set-name">What should Knox call you?</label>
       <input type="text" id="set-name" placeholder="sir">
     </div>
 
@@ -493,8 +493,8 @@
       <summary>Advanced: use a proxy instead</summary>
       <div class="field">
         <label for="set-proxy">Proxy URL</label>
-        <input type="url" id="set-proxy" placeholder="https://jarvis.your-name.workers.dev" autocomplete="off" spellcheck="false">
-        <p class="hint">Optional. If you deploy jarvis/worker.js to Cloudflare, your real key lives there instead of on the phone; put the worker URL here and your passphrase in the key box above.</p>
+        <input type="url" id="set-proxy" placeholder="https://knox.your-name.workers.dev" autocomplete="off" spellcheck="false">
+        <p class="hint">Optional. If you deploy knox/worker.js to Cloudflare, your real key lives there instead of on the phone; put the worker URL here and your passphrase in the key box above.</p>
       </div>
     </details>
 
@@ -510,12 +510,12 @@
 
   // ---------- settings ----------
 
-  var SETTINGS_KEY = 'jarvis-settings';
-  var CONVO_KEY = 'jarvis-conversation';
+  var SETTINGS_KEY = 'knox-settings';
+  var CONVO_KEY = 'knox-conversation';
   var DEFAULT_SETTINGS = { apiKey: '', name: '', model: 'claude-opus-5', speak: true, voice: '', proxyUrl: '' };
 
   // A conversation is resumed if you come back to it within this window;
-  // after that Jarvis starts fresh rather than dragging old context along.
+  // after that Knox starts fresh rather than dragging old context along.
   var CONVO_IDLE_MS = 6 * 60 * 60 * 1000;
   // Hard caps on one conversation. History is never trimmed from the front
   // (that would rewrite earlier turns the model already saw), so a long
@@ -545,7 +545,7 @@
 
   // ---------- shared Hive data (same keys/shapes as the other apps) ----------
   //
-  // Jarvis is served from the same origin as the To-Do List, Calendar and
+  // Knox is served from the same origin as the To-Do List, Calendar and
   // Expense Tracker, so it can read and write their localStorage directly.
   // The keys and record shapes below must stay in sync with those apps.
 
@@ -798,7 +798,7 @@
   // ---------- system prompt ----------
 
   var PERSONA = [
-    'You are Jarvis, a personal assistant living on the user\'s phone, in the spirit of Tony Stark\'s J.A.R.V.I.S.:',
+    'You are Knox, a personal assistant living on the user\'s phone, in the spirit of Tony Stark\'s J.A.R.V.I.S.:',
     'calm, capable, quietly witty and unfailingly polite, with a British turn of phrase.',
     '',
     'Your replies are usually read aloud by text-to-speech, so write for the ear:',
@@ -886,7 +886,7 @@
       if (m.role === 'assistant') {
         var t = textOf(m.content);
         var isToolTurn = Array.isArray(m.content) && m.content.some(function (b) { return b.type === 'tool_use'; });
-        if (t && !isToolTurn) { addBubble('jarvis', t); shown++; }
+        if (t && !isToolTurn) { addBubble('knox', t); shown++; }
       }
     });
     if (!shown) {
@@ -1121,7 +1121,7 @@
 
       if (!reply) reply = 'Done.';
       persistConvo();
-      addBubble('jarvis', reply);
+      addBubble('knox', reply);
       setState('idle');
       speak(reply);
     } catch (err) {
