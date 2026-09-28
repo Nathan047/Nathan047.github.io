@@ -1,9 +1,9 @@
 {
-  "name": "Jarvis",
-  "short_name": "Jarvis",
+  "name": "Knox",
+  "short_name": "Knox",
   "description": "A voice assistant that runs my to-do list, calendar and expenses.",
-  "start_url": "/jarvis/",
-  "scope": "/jarvis/",
+  "start_url": "/knox/",
+  "scope": "/knox/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#070A10",

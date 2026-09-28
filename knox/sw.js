@@ -1,9 +1,9 @@
-// Service worker: lets Jarvis install to the home screen and open offline.
+// Service worker: lets Knox install to the home screen and open offline.
 // Network-first for everything it serves, falling back to the last cached
 // copy, so a new deploy shows up on the next launch rather than being
 // pinned behind a stale cache. API calls to Anthropic are never cached.
 
-const CACHE = 'jarvis-v1';
+const CACHE = 'knox-v1';
 const SHELL = ['./', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 
 self.addEventListener('install', (event) => {
