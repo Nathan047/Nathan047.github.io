@@ -398,6 +398,21 @@
     margin-bottom: 0.75rem;
   }
 
+  .memory-set {
+    margin: 0 0 1rem;
+    padding: 0.9rem 0.9rem 0.6rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+
+  .memory-set legend {
+    padding: 0 0.35rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .memory-set > .hint { margin: 0 0 0.8rem; }
+
   .settings-actions {
     display: flex;
     justify-content: flex-end;
@@ -489,6 +504,22 @@
       <select id="set-voice"></select>
     </div>
 
+    <fieldset class="memory-set">
+      <legend>Memory (Obsidian vault on GitHub)</legend>
+      <p class="hint">Knox saves everything it learns about you as notes in a private GitHub repo, which the Obsidian Git plugin syncs into Obsidian. Leave blank to run without memory.</p>
+      <div class="field">
+        <label for="set-gh-repo">Vault repo</label>
+        <input type="text" id="set-gh-repo" placeholder="your-github-name/obsidian-vault" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="set-gh-token">GitHub access token</label>
+        <input type="password" id="set-gh-token" placeholder="github_pat_…" autocomplete="off" spellcheck="false">
+        <p class="hint">A fine-grained token with access to only this repo, and Contents: Read and write.</p>
+      </div>
+      <button type="button" class="btn btn-ghost" id="gh-test">Test connection</button>
+      <p class="hint" id="gh-test-result" aria-live="polite"></p>
+    </fieldset>
+
     <details class="advanced">
       <summary>Advanced: use a proxy instead</summary>
       <div class="field">
@@ -512,7 +543,7 @@
 
   var SETTINGS_KEY = 'knox-settings';
   var CONVO_KEY = 'knox-conversation';
-  var DEFAULT_SETTINGS = { apiKey: '', name: '', model: 'claude-opus-5', speak: true, voice: '', proxyUrl: '' };
+  var DEFAULT_SETTINGS = { apiKey: '', name: '', model: 'claude-opus-5', speak: true, voice: '', proxyUrl: '', ghRepo: '', ghToken: '' };
 
   // A conversation is resumed if you come back to it within this window;
   // after that Knox starts fresh rather than dragging old context along.
@@ -785,14 +816,290 @@
     }
   ];
 
-  function runTool(name, input) {
-    var impl = TOOL_IMPL[name];
-    if (!impl) return { content: 'Unknown tool: ' + name, is_error: true };
+  // ---------- memory: an Obsidian vault kept in a private GitHub repo ----------
+  //
+  // Claude's built-in memory tool works on paths under /memories; here that
+  // prefix maps onto the root of the repo, so every memory is an ordinary
+  // markdown note the user can read and edit in Obsidian (synced with the
+  // Obsidian Git plugin). Reads and writes go straight to the GitHub REST
+  // API from the browser using a fine-grained token scoped to that one repo.
+
+  var MEMORY_ROOT = '/memories';
+  var VIEW_CHAR_LIMIT = 16000;
+  var MAX_NOTE_BYTES = 200000;
+  var TRASH_DIR = '.trash'; // Obsidian's own "move to trash" folder
+
+  function memoryEnabled() { return !!(settings.ghRepo && settings.ghToken); }
+
+  var vaultBranch = null; // cached per page load
+
+  async function gh(path, opts) {
+    opts = opts || {};
+    var res = await fetch('https://api.github.com' + path, {
+      method: opts.method || 'GET',
+      headers: {
+        'Authorization': 'Bearer ' + settings.ghToken,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json'
+      },
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+      cache: 'no-store'
+    });
+    var data = null;
+    try { data = await res.json(); } catch (e) {}
+    if (!res.ok) {
+      var err = new Error(ghErrorText(res.status, data));
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }
+
+  function ghErrorText(status, data) {
+    if (status === 401) return 'GitHub rejected the token. Check it in Settings.';
+    if (status === 403) return 'The GitHub token lacks permission (it needs Contents: read and write on the vault repo).';
+    if (status === 404) return 'GitHub repo "' + settings.ghRepo + '" not found (check the name, and that the token can see it).';
+    return 'GitHub error ' + status + (data && data.message ? ': ' + data.message : '');
+  }
+
+  function repoPath() {
+    return '/repos/' + settings.ghRepo.split('/').map(encodeURIComponent).join('/');
+  }
+
+  function encodePath(p) { return p.split('/').map(encodeURIComponent).join('/'); }
+
+  async function branch() {
+    if (!vaultBranch) vaultBranch = (await gh(repoPath())).default_branch || 'main';
+    return vaultBranch;
+  }
+
+  // Every file in the vault: [{path, size, sha}]. A brand-new repo with no
+  // commits yet answers 409, which just means "empty".
+  async function vaultTree() {
+    var b = await branch();
     try {
-      return { content: JSON.stringify(impl(input && typeof input === 'object' ? input : {})) };
+      var t = await gh(repoPath() + '/git/trees/' + encodeURIComponent(b) + '?recursive=1');
+      return t.tree.filter(function (x) { return x.type === 'blob'; });
+    } catch (e) {
+      if (e.status === 409 || e.status === 404) return [];
+      throw e;
+    }
+  }
+
+  function b64encode(text) {
+    var bytes = new TextEncoder().encode(text);
+    var bin = '';
+    for (var i = 0; i < bytes.length; i += 0x8000) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    }
+    return btoa(bin);
+  }
+
+  function b64decode(b64) {
+    var bin = atob(b64.replace(/\s/g, ''));
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+
+  async function readNote(path) { // -> {text, sha} or null
+    try {
+      var f = await gh(repoPath() + '/contents/' + encodePath(path) + '?ref=' + encodeURIComponent(await branch()));
+      if (Array.isArray(f) || f.type !== 'file') return null;
+      return { text: b64decode(f.content || ''), sha: f.sha };
+    } catch (e) {
+      if (e.status === 404) return null;
+      throw e;
+    }
+  }
+
+  async function writeNote(path, text, sha, message) {
+    if (new TextEncoder().encode(text).length > MAX_NOTE_BYTES) throw new Error('Note too large; split it into smaller notes.');
+    var body = { message: message || 'Knox: update ' + path, content: b64encode(text), branch: await branch() };
+    if (sha) body.sha = sha;
+    try {
+      await gh(repoPath() + '/contents/' + encodePath(path), { method: 'PUT', body: body });
+    } catch (e) {
+      if (e.status === 422 && !sha && /empty/i.test(e.message)) {
+        // First ever commit to an empty repo: GitHub wants no branch field.
+        delete body.branch;
+        await gh(repoPath() + '/contents/' + encodePath(path), { method: 'PUT', body: body });
+        return;
+      }
+      if (e.status === 409 || e.status === 422) {
+        // The file changed underneath us (e.g. Obsidian Git just pushed).
+        // Refetch its sha and retry once, keeping our version.
+        var fresh = await readNote(path);
+        body.sha = fresh ? fresh.sha : undefined;
+        await gh(repoPath() + '/contents/' + encodePath(path), { method: 'PUT', body: body });
+        return;
+      }
+      throw e;
+    }
+  }
+
+  async function removeNote(path, sha) {
+    await gh(repoPath() + '/contents/' + encodePath(path), {
+      method: 'DELETE',
+      body: { message: 'Knox: remove ' + path, sha: sha, branch: await branch() }
+    });
+  }
+
+  // /memories/People/Sam.md -> "People/Sam.md"; /memories -> "". Throws on
+  // anything that could escape the vault or touch hidden folders (.git,
+  // .obsidian, .trash).
+  function toRepoPath(p) {
+    if (typeof p !== 'string') throw new Error('Error: path is required');
+    var decoded;
+    try { decoded = decodeURIComponent(p); } catch (e) { decoded = p; }
+    if (decoded.indexOf('\\') !== -1) throw new Error('Error: invalid path ' + p);
+    var trimmed = decoded.replace(/\/+$/, '');
+    if (trimmed !== MEMORY_ROOT && trimmed.indexOf(MEMORY_ROOT + '/') !== 0) {
+      throw new Error('Error: paths must be inside ' + MEMORY_ROOT);
+    }
+    var rel = trimmed.slice(MEMORY_ROOT.length + 1);
+    if (!rel) return '';
+    rel.split('/').forEach(function (seg) {
+      if (!seg || seg === '.' || seg === '..' || seg.charAt(0) === '.') throw new Error('Error: invalid path ' + p);
+    });
+    return rel;
+  }
+
+  function humanSize(n) {
+    if (n < 1024) return n + 'B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + 'K';
+    return (n / 1024 / 1024).toFixed(1) + 'M';
+  }
+
+  function isHidden(path) { return path.split('/').some(function (s) { return s.charAt(0) === '.'; }); }
+
+  function filesUnder(tree, dir) {
+    return tree.filter(function (f) { return !isHidden(f.path) && (!dir || f.path.indexOf(dir + '/') === 0); });
+  }
+
+  function withLineNumbers(text, range) {
+    var lines = text.replace(/\n$/, '').split('\n');
+    var start = 1, end = lines.length;
+    if (Array.isArray(range) && range.length === 2) {
+      start = Math.max(1, range[0] | 0);
+      end = range[1] === -1 ? lines.length : Math.min(lines.length, range[1] | 0);
+    }
+    var out = [];
+    for (var i = start; i <= end; i++) out.push(String(i).padStart(6, ' ') + '\t' + lines[i - 1]);
+    var s = out.join('\n');
+    if (s.length > VIEW_CHAR_LIMIT) s = s.slice(0, VIEW_CHAR_LIMIT) + '\n[truncated; use view_range to read further]';
+    return s;
+  }
+
+  async function runMemory(input) {
+    var cmd = input.command;
+    var shown = input.path || input.old_path;
+
+    if (cmd === 'view') {
+      var rel = toRepoPath(input.path);
+      var tree = await vaultTree();
+      var file = rel && tree.filter(function (f) { return f.path === rel; })[0];
+      if (file) {
+        if (/\.(png|jpe?g|gif|webp|pdf)$/i.test(rel)) return 'Binary file ' + input.path + ' (' + humanSize(file.size) + '); only text notes can be viewed.';
+        var note = await readNote(rel);
+        return "Here's the content of " + input.path + ' with line numbers:\n' + withLineNumbers(note ? note.text : '', input.view_range);
+      }
+      var inside = filesUnder(tree, rel);
+      if (rel && !inside.length) throw new Error('The path ' + input.path + ' does not exist. Please provide a valid path.');
+      var base = rel ? MEMORY_ROOT + '/' + rel : MEMORY_ROOT;
+      var entries = {};
+      var total = 0;
+      inside.forEach(function (f) {
+        total += f.size;
+        var relToDir = rel ? f.path.slice(rel.length + 1) : f.path;
+        var parts = relToDir.split('/');
+        var key = parts.length === 1 ? parts[0] : parts.length === 2 ? parts[0] + '/' + parts[1] : null;
+        if (parts.length > 1) entries[parts[0]] = (entries[parts[0]] || 0) + f.size; // folder total
+        if (key) entries[key] = (entries[key] || 0) + f.size;
+      });
+      var lines = [humanSize(total) + '\t' + base];
+      Object.keys(entries).sort().forEach(function (k) { lines.push(humanSize(entries[k]) + '\t' + base + '/' + k); });
+      return "Here're the files and directories up to 2 levels deep in " + base + ', excluding hidden items and node_modules:\n' + lines.join('\n');
+    }
+
+    if (cmd === 'create') {
+      var cPath = toRepoPath(input.path);
+      if (!cPath) throw new Error('Error: cannot overwrite the memory root');
+      var existing = await readNote(cPath);
+      await writeNote(cPath, String(input.file_text || ''), existing && existing.sha, (existing ? 'Knox: update ' : 'Knox: add ') + cPath);
+      return 'File created successfully at: ' + input.path;
+    }
+
+    if (cmd === 'str_replace' || cmd === 'insert') {
+      var ePath = toRepoPath(input.path);
+      var cur = ePath ? await readNote(ePath) : null;
+      if (!cur) throw new Error('Error: The path ' + input.path + ' does not exist. Please provide a valid path.');
+      var next;
+      if (cmd === 'str_replace') {
+        var oldStr = String(input.old_str || '');
+        var count = oldStr ? cur.text.split(oldStr).length - 1 : 0;
+        if (count === 0) throw new Error('No replacement was performed, old_str `' + oldStr + '` did not appear verbatim in ' + input.path + '.');
+        if (count > 1) throw new Error('No replacement was performed. Multiple occurrences of old_str `' + oldStr + '`. Please ensure it is unique');
+        next = cur.text.replace(oldStr, function () { return String(input.new_str || ''); });
+      } else {
+        var ls = cur.text.split('\n');
+        var at = input.insert_line | 0;
+        if (at < 0 || at > ls.length) throw new Error('Error: Invalid `insert_line` parameter: ' + at + '. It should be within the range of lines of the file: [0, ' + ls.length + ']');
+        ls.splice(at, 0, String(input.insert_text || '').replace(/\n$/, ''));
+        next = ls.join('\n');
+      }
+      await writeNote(ePath, next, cur.sha, 'Knox: edit ' + ePath);
+      return cmd === 'insert' ? 'The file ' + input.path + ' has been edited.' : 'The memory file has been edited.';
+    }
+
+    if (cmd === 'delete' || cmd === 'rename') {
+      var from = toRepoPath(cmd === 'delete' ? input.path : input.old_path);
+      if (!from) throw new Error('Error: cannot ' + cmd + ' the memory root');
+      var to = cmd === 'rename' ? toRepoPath(input.new_path) : null;
+      if (cmd === 'rename' && !to) throw new Error('Error: invalid new_path');
+      var all = await vaultTree();
+      var moving = all.filter(function (f) { return f.path === from || f.path.indexOf(from + '/') === 0; });
+      if (!moving.length) throw new Error('Error: The path ' + shown + ' does not exist');
+      var stamp = dateKey(new Date()) + '-' + Date.now().toString(36);
+      var targets = moving.map(function (f) {
+        var tail = f.path.slice(from.length); // "" for a file, "/x.md" inside a folder
+        // Deleting moves to Obsidian's trash rather than destroying anything.
+        return cmd === 'rename' ? to + tail : TRASH_DIR + '/' + stamp + '/' + from + tail;
+      });
+      if (cmd === 'rename') {
+        var clash = all.some(function (f) { return f.path === to || f.path.indexOf(to + '/') === 0; });
+        if (clash) throw new Error('Error: The destination ' + input.new_path + ' already exists');
+      }
+      for (var i = 0; i < moving.length; i++) {
+        var src = await readNote(moving[i].path);
+        if (!src) continue;
+        await writeNote(targets[i], src.text, null, 'Knox: ' + (cmd === 'rename' ? 'move ' : 'trash ') + moving[i].path);
+        await removeNote(moving[i].path, src.sha);
+      }
+      return cmd === 'rename' ? 'Successfully renamed ' + input.old_path + ' to ' + input.new_path : 'Successfully deleted ' + input.path;
+    }
+
+    throw new Error('Error: unknown command ' + cmd);
+  }
+
+  async function runTool(name, input) {
+    input = input && typeof input === 'object' ? input : {};
+    try {
+      if (name === 'memory') {
+        if (!memoryEnabled()) return { content: 'Memory is not set up (no GitHub vault in Settings).', is_error: true };
+        return { content: await runMemory(input) };
+      }
+      var impl = TOOL_IMPL[name];
+      if (!impl) return { content: 'Unknown tool: ' + name, is_error: true };
+      return { content: JSON.stringify(impl(input)) };
     } catch (e) {
       return { content: e.message || String(e), is_error: true };
     }
+  }
+
+  function activeTools() {
+    return memoryEnabled() ? TOOLS.concat([{ type: 'memory_20250818', name: 'memory' }]) : TOOLS;
   }
 
   // ---------- system prompt ----------
@@ -810,6 +1117,20 @@
     'and their Expense Tracker (in pounds). Use them whenever the request touches that data, and confirm what you changed in a few words.',
     'Use web search for anything current, such as weather, news, sport, opening times or prices.',
     'If a request is ambiguous in a way that matters (which day, how much), ask one short question instead of guessing.'
+  ].join('\n');
+
+  var MEMORY_GUIDE = [
+    'You have a permanent memory: your memory directory is the user\'s Obsidian vault, a folder of markdown notes they can read and edit themselves.',
+    'Remember everything. Whenever the user tells you anything about themselves or their life (people, relationships, work, health, preferences, habits, plans,',
+    'events, decisions, opinions, places, things they own, things they want), save it without being asked, even in passing. Also keep a short dated log of',
+    'what you talked about in Journal/YYYY-MM-DD.md.',
+    'Write notes the way a tidy Obsidian user would: one note per person, place or topic (e.g. "About me.md", "People/Sam.md", "Health.md", "Plans/Barcelona trip.md"),',
+    'a "# Title" heading, short bullet points with dates where useful, and [[wikilinks]] between related notes. Update existing notes rather than duplicating them;',
+    'when a fact changes, correct it and note the date.',
+    'Before answering anything personal, check the relevant notes, and use what you know naturally without announcing it.',
+    'Never store passwords, PINs, API keys, bank or card numbers. If the user asks you to forget something, delete or edit it.',
+    'The user may have edited notes themselves; treat the vault as the source of truth.',
+    'Do not narrate memory housekeeping in your spoken reply unless asked; a brief "noted" is enough when you saved something they told you.'
   ].join('\n');
 
   function contextBlock() {
@@ -835,7 +1156,7 @@
   }
 
   function userTurnCount() {
-    return convo.messages.filter(function (m) { return m.role === 'user' && typeof m.content === 'string'; }).length;
+    return convo.messages.filter(function (m) { return m.role === 'user' && userText(m); }).length;
   }
 
   function resetConvo(note) {
@@ -851,6 +1172,13 @@
   var statusEl = document.getElementById('status');
   var textInput = document.getElementById('text-input');
   var sendBtn = document.getElementById('send-btn');
+
+  // The user's own words in a user message ('' for a pure tool-results turn).
+  function userText(m) {
+    if (typeof m.content === 'string') return m.content;
+    return m.content.filter(function (b) { return b.type === 'text'; })
+      .map(function (b) { return b.text; }).join(' ').trim();
+  }
 
   function textOf(content) {
     if (typeof content === 'string') return content;
@@ -882,7 +1210,7 @@
     convo.messages.forEach(function (m) {
       // Only the human-readable ends of each exchange: the user's own words
       // and assistant turns that actually said something (not tool plumbing).
-      if (m.role === 'user' && typeof m.content === 'string') { addBubble('user', m.content); shown++; }
+      if (m.role === 'user' && userText(m)) { addBubble('user', userText(m)); shown++; }
       if (m.role === 'assistant') {
         var t = textOf(m.content);
         var isToolTurn = Array.isArray(m.content) && m.content.some(function (b) { return b.type === 'tool_use'; });
@@ -1023,7 +1351,9 @@
 
   // ---------- talking to Claude ----------
 
-  var MAX_LOOP_ITERATIONS = 10;
+  // Memory lookups and saves add steps (check notes, read one, update it),
+  // so this is higher than a plain app-tools loop would need.
+  var MAX_LOOP_ITERATIONS = 16;
   var busy = false;
 
   function makeClient() {
@@ -1036,11 +1366,15 @@
     var params = {
       model: settings.model,
       max_tokens: 16000,
-      system: [
+      system: memoryEnabled() ? [
+        { type: 'text', text: PERSONA },
+        { type: 'text', text: MEMORY_GUIDE, cache_control: { type: 'ephemeral' } },
+        { type: 'text', text: contextBlock() }
+      ] : [
         { type: 'text', text: PERSONA, cache_control: { type: 'ephemeral' } },
         { type: 'text', text: contextBlock() }
       ],
-      tools: TOOLS,
+      tools: activeTools(),
       messages: convo.messages,
       output_config: { effort: 'medium' }
     };
@@ -1070,6 +1404,18 @@
     return 'Something went wrong: ' + (err && err.message ? err.message : String(err));
   }
 
+  // Adds the user's words to the history. If the last message is already a
+  // user turn (tool results left behind by an interrupted request), the text
+  // joins it rather than starting a second user message in a row.
+  function pushUserText(text) {
+    var last = convo.messages[convo.messages.length - 1];
+    if (last && last.role === 'user' && Array.isArray(last.content)) {
+      last.content.push({ type: 'text', text: text });
+    } else {
+      convo.messages.push({ role: 'user', content: text });
+    }
+  }
+
   async function send(text) {
     text = (text || '').trim();
     if (!text || busy) return;
@@ -1084,12 +1430,14 @@
     }
 
     busy = true;
-    var checkpoint = convo.messages.length;
+    var snapshot = JSON.stringify(convo.messages);
+    var done = []; // side effects that really happened, for the error message
     addBubble('user', text);
-    convo.messages.push({ role: 'user', content: text });
+    pushUserText(text);
     setState('thinking', 'Thinking…');
 
     var reply = '';
+    var finished = false;
     try {
       var client = makeClient();
       for (var i = 0; i < MAX_LOOP_ITERATIONS; i++) {
@@ -1100,6 +1448,7 @@
 
         if (response.stop_reason === 'refusal') {
           reply = textOf(response.content) || "I'm afraid I can't help with that one.";
+          finished = true;
           break;
         }
 
@@ -1107,34 +1456,59 @@
         if (response.stop_reason !== 'tool_use' || !toolUses.length) {
           reply = textOf(response.content);
           if (response.stop_reason === 'max_tokens') reply += (reply ? ' ' : '') + '(I ran out of room there.)';
+          finished = true;
           break;
         }
 
         statusEl.textContent = toolUses.map(toolLabel).join(' · ');
-        var results = toolUses.map(function (t) {
-          var r = runTool(t.name, t.input);
-          return { type: 'tool_result', tool_use_id: t.id, content: r.content, is_error: !!r.is_error };
-        });
+        var results = [];
+        // One at a time: several memory edits to the same note must not race.
+        for (var j = 0; j < toolUses.length; j++) {
+          var t = toolUses[j];
+          var r = await runTool(t.name, t.input);
+          var label = !r.is_error && WRITE_LABELS[t.name] ? WRITE_LABELS[t.name](t.input) : null;
+          if (label) done.push(label);
+          results.push({ type: 'tool_result', tool_use_id: t.id, content: r.content, is_error: !!r.is_error });
+        }
         // All results for one assistant turn go back in a single user message.
         convo.messages.push({ role: 'user', content: results });
       }
 
-      if (!reply) reply = 'Done.';
+      if (!finished) reply = 'That took more steps than I allow, so I stopped partway. Ask me to carry on if you like.';
+      else if (!reply) reply = 'Done.';
       persistConvo();
       addBubble('knox', reply);
       setState('idle');
       speak(reply);
     } catch (err) {
-      // Roll back this exchange so a failed request never leaves a dangling
-      // tool_use or unanswered user turn in the saved history.
-      convo.messages.length = checkpoint;
+      if (!done.length) {
+        // Nothing changed anywhere: forget this exchange entirely.
+        convo.messages = JSON.parse(snapshot);
+      } else {
+        // Some changes already happened. Keep the history up to the last
+        // complete tool results so a retry carries on rather than redoing
+        // them, dropping only an assistant turn that never got its results.
+        while (convo.messages.length && convo.messages[convo.messages.length - 1].role === 'assistant') convo.messages.pop();
+      }
       persistConvo();
-      addBubble('error', describeError(err));
+      var msg = describeError(err);
+      if (done.length) msg += ' Before that I had already ' + unique(done).join(', ') + ', so no need to repeat those.';
+      addBubble('error', msg);
       setState('idle');
     } finally {
       busy = false;
     }
   }
+
+  function unique(list) { return list.filter(function (x, i) { return list.indexOf(x) === i; }); }
+
+  var WRITE_LABELS = {
+    add_todo: function (i) { return 'added "' + i.text + '" to your to-do list'; },
+    complete_todo: function () { return 'ticked a task off'; },
+    set_calendar_note: function (i) { return 'updated your calendar for ' + i.date; },
+    add_expense: function (i) { return 'logged £' + Number(i.amount).toFixed(2); },
+    memory: function (i) { return i.command === 'view' ? null : 'updated my memory'; }
+  };
 
   function toolLabel(t) {
     return {
@@ -1144,7 +1518,8 @@
       get_calendar: 'Checking your calendar…',
       set_calendar_note: 'Updating your calendar…',
       add_expense: 'Logging the expense…',
-      get_expenses: 'Checking your spending…'
+      get_expenses: 'Checking your spending…',
+      memory: t.input && t.input.command === 'view' ? 'Checking my memory…' : 'Saving to memory…'
     }[t.name] || 'Working…';
   }
 
@@ -1183,6 +1558,36 @@
   var fSpeak = document.getElementById('set-speak');
   var fVoice = document.getElementById('set-voice');
   var fProxy = document.getElementById('set-proxy');
+  var fGhRepo = document.getElementById('set-gh-repo');
+  var fGhToken = document.getElementById('set-gh-token');
+  var ghTestResult = document.getElementById('gh-test-result');
+
+  // Accept a pasted repo URL as well as "owner/name".
+  function cleanRepo(v) {
+    return v.trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\.git$/i, '').replace(/\/+$/, '');
+  }
+
+  document.getElementById('gh-test').addEventListener('click', async function () {
+    var saved = { ghRepo: settings.ghRepo, ghToken: settings.ghToken };
+    settings.ghRepo = cleanRepo(fGhRepo.value);
+    settings.ghToken = fGhToken.value.trim();
+    vaultBranch = null;
+    ghTestResult.textContent = 'Checking…';
+    try {
+      if (!memoryEnabled()) throw new Error('Fill in both the repo and the token first.');
+      var repo = await gh(repoPath());
+      if (!repo.private) throw new Error('That repo is public. Make it private first, or anyone could read your memories.');
+      if (repo.permissions && !repo.permissions.push) throw new Error('The token can read this repo but not write to it. Give it Contents: Read and write.');
+      var notes = (await vaultTree()).filter(function (f) { return /\.md$/i.test(f.path) && !isHidden(f.path); }).length;
+      ghTestResult.textContent = 'Connected. The vault has ' + notes + (notes === 1 ? ' note.' : ' notes.');
+    } catch (e) {
+      ghTestResult.textContent = e.message;
+    } finally {
+      settings.ghRepo = saved.ghRepo;
+      settings.ghToken = saved.ghToken;
+      vaultBranch = null;
+    }
+  });
 
   function fillVoices() {
     var voices = synth ? synth.getVoices().filter(function (v) { return /^en/i.test(v.lang); }) : [];
@@ -1214,6 +1619,9 @@
     fModel.value = settings.model;
     fSpeak.checked = !!settings.speak;
     fProxy.value = settings.proxyUrl;
+    fGhRepo.value = settings.ghRepo;
+    fGhToken.value = settings.ghToken;
+    ghTestResult.textContent = '';
     if (settings.proxyUrl) dialog.querySelector('details').open = true;
     fillVoices();
     syncKeyLabel();
@@ -1230,6 +1638,9 @@
     settings.speak = fSpeak.checked;
     settings.voice = fVoice.value;
     settings.proxyUrl = fProxy.value.trim();
+    settings.ghRepo = cleanRepo(fGhRepo.value);
+    settings.ghToken = fGhToken.value.trim();
+    vaultBranch = null;
     if (!saveJSON(SETTINGS_KEY, settings)) {
       addBubble('error', "Couldn't save settings on this device (private browsing?). They'll last until you close the page.");
     }
