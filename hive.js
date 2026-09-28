@@ -96,6 +96,11 @@
       name: 'Expense Tracker', status: 'Shipped', label: '04', href: '/expense-tracker/',
       body: "Every pound accounted for — log a purchase in two taps and see exactly where it went.",
       tags: ['HTML', 'JavaScript']
+    },
+    {
+      name: 'Jarvis', status: 'Shipped', label: '05', href: '/jarvis/',
+      body: "My own voice assistant for my phone — talk to it and it runs my to-do list, calendar and expenses, and searches the web.",
+      tags: ['HTML', 'JavaScript', 'Claude API']
     }
   ];
 
